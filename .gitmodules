@@ -1,0 +1,3 @@
+[submodule "logvisor"]
+	path = logvisor
+	url = https://github.com/AxioDL/logvisor.git
