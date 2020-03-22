@@ -45,9 +45,24 @@ template <class Application> class WindowXcb : public WindowBase {
     m_parent->flushLater();
   }
 
+  bool createSurface(
+      vk::UniqueSurfaceKHR&& physSurface,
+      std::function<void(const hsh::extent2d&)>&& resizeLambda) noexcept {
+    xcb_connection_t* conn = *m_parent;
+    xcb_window_t win = m_window;
+    m_surface =
+        hsh::create_surface(std::move(physSurface), std::move(resizeLambda));
+    return m_surface.operator bool();
+  }
+
   operator xcb_window_t() const noexcept { return m_window; }
 
 public:
+  using ID = xcb_window_t;
+  ID getID() const noexcept { return m_window; }
+  bool operator==(ID id) const noexcept { return m_window == id; }
+  bool operator!=(ID id) const noexcept { return m_window != id; }
+
   WindowXcb() noexcept = default;
 
   ~WindowXcb() noexcept {
@@ -140,7 +155,7 @@ public:
 
     if (!this->m_device) {
       this->m_device =
-          VulkanDevice(this->m_instance, this->m_delegate, *physSurface);
+          VulkanDevice(this->m_instance, *this, this->m_delegate, *physSurface);
       if (!this->m_device) {
         Log.report(logvisor::Error, fmt("No valid Vulkan devices accepted"));
         return {};
@@ -148,8 +163,12 @@ public:
       m_buildingPipelines = true;
     }
 
-    window.m_surface = hsh::create_surface(std::move(physSurface));
-    if (!window.m_surface) {
+    auto windowId = window.getID();
+    if (!window.createSurface(std::move(physSurface),
+                              [this, windowId](const hsh::extent2d& extent) {
+                                this->m_delegate.onWindowResize(*this, windowId,
+                                                                extent);
+                              })) {
       Log.report(logvisor::Error,
                  fmt("Vulkan surface not compatible with existing device"));
       return {};

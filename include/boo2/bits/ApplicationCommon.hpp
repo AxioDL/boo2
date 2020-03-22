@@ -70,30 +70,32 @@ logvisor::Module VulkanInstance::Log("boo2::VulkanInstance");
 class VulkanDevice : public hsh::vulkan_device_owner {
 public:
   VulkanDevice() noexcept = default;
-  template <typename Delegate>
-  VulkanDevice(const VulkanInstance& instance, Delegate& delegate,
+  template <typename App, typename Delegate>
+  VulkanDevice(const VulkanInstance& instance, App& a, Delegate& delegate,
                vk::SurfaceKHR checkSurface = {}) noexcept
       : hsh::vulkan_device_owner(instance.enumerate_vulkan_devices(
             [&](const vk::PhysicalDeviceProperties& props) {
-              return delegate.onAcceptDeviceRequest(props);
+              return delegate.onAcceptDeviceRequest(a, props);
             },
             checkSurface)) {}
 };
 
-template <class PCFM, class Delegate> class ApplicationVulkan {
+template <class PCFM> class ApplicationVulkan {
 protected:
   VulkanInstance m_instance;
   VulkanDevice m_device;
 
   hsh::vulkan_device_owner::pipeline_build_pump<PCFM> m_buildPump;
 
-  bool pumpBuildVulkanPipelines(PCFM& pcfm, Delegate& delegate) noexcept {
+  template <class App, class Delegate>
+  bool pumpBuildVulkanPipelines(PCFM& pcfm, App& a,
+                                Delegate& delegate) noexcept {
     std::size_t done, count;
 
     if (!m_buildPump) {
       m_buildPump = m_device.start_build_pipelines(pcfm);
       std::tie(done, count) = m_buildPump.get_progress();
-      delegate.onStartBuildPipelines(done, count);
+      delegate.onStartBuildPipelines(a, done, count);
       return count != 0;
     }
 
@@ -104,13 +106,13 @@ protected:
               std::chrono::steady_clock::now() - start)
               .count() > 100) {
         std::tie(done, count) = m_buildPump.get_progress();
-        delegate.onUpdateBuildPipelines(done, count);
+        delegate.onUpdateBuildPipelines(a, done, count);
         return true;
       }
     }
 
     std::tie(done, count) = m_buildPump.get_progress();
-    delegate.onEndBuildPipelines(done, count);
+    delegate.onEndBuildPipelines(a, done, count);
     return false;
   }
 

@@ -1,6 +1,5 @@
 #include <boo2/boo2.hpp>
 #include <iostream>
-#include <unistd.h>
 
 #include "testpipeline.hpp"
 
@@ -47,21 +46,26 @@ public:
 
 #if HSH_ENABLE_VULKAN
   bool
-  onAcceptDeviceRequest(const vk::PhysicalDeviceProperties& props) noexcept {
+  onAcceptDeviceRequest(App& a, const vk::PhysicalDeviceProperties& props) noexcept {
     return true;
   }
 #endif
 
-  void onStartBuildPipelines(std::size_t done, std::size_t count) noexcept {
+  void onStartBuildPipelines(App& a, std::size_t done, std::size_t count) noexcept {
     std::cout << "start " << done << "/" << count << std::endl;
   }
 
-  void onUpdateBuildPipelines(std::size_t done, std::size_t count) noexcept {
+  void onUpdateBuildPipelines(App& a, std::size_t done, std::size_t count) noexcept {
     std::cout << "update " << done << "/" << count << std::endl;
   }
 
-  void onEndBuildPipelines(std::size_t done, std::size_t count) noexcept {
+  void onEndBuildPipelines(App& a, std::size_t done, std::size_t count) noexcept {
     std::cout << "end " << done << "/" << count << std::endl;
+  }
+
+  void onWindowResize(App& a, typename Win::ID id,
+                      const hsh::extent2d& extent) noexcept {
+    std::cout << "resize " << extent.w << "*" << extent.h << std::endl;
   }
 };
 

@@ -26,14 +26,21 @@ public:
 
 #if HSH_ENABLE_VULKAN
   bool
-  onAcceptDeviceRequest(const vk::PhysicalDeviceProperties& props) noexcept {
+  onAcceptDeviceRequest(App& a,
+                        const vk::PhysicalDeviceProperties& props) noexcept {
     return true;
   }
 #endif
 
-  void onStartBuildPipelines(std::size_t done, std::size_t count) noexcept {}
-  void onUpdateBuildPipelines(std::size_t done, std::size_t count) noexcept {}
-  void onEndBuildPipelines(std::size_t done, std::size_t count) noexcept {}
+  void onStartBuildPipelines(App& a, std::size_t done,
+                             std::size_t count) noexcept {}
+  void onUpdateBuildPipelines(App& a, std::size_t done,
+                              std::size_t count) noexcept {}
+  void onEndBuildPipelines(App& a, std::size_t done,
+                           std::size_t count) noexcept {}
+
+  void onWindowResize(App& a, typename Win::ID id,
+                      const hsh::extent2d& extent) noexcept {}
 };
 
 } // namespace boo2

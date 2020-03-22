@@ -109,9 +109,9 @@ logvisor::Module
     PosixPipelineCacheFileManager::Log("boo2::PosixPipelineCacheFileManager");
 
 template <class App, class Win, template <class, class> class Delegate>
-class ApplicationPosix : public ApplicationBase,
-                         public ApplicationVulkan<PosixPipelineCacheFileManager,
-                                                  Delegate<App, Win>> {
+class ApplicationPosix
+    : public ApplicationBase,
+      public ApplicationVulkan<PosixPipelineCacheFileManager> {
 protected:
   Delegate<App, Win> m_delegate;
   XdgPaths m_xdgPaths;
@@ -121,12 +121,12 @@ protected:
   explicit ApplicationPosix(SystemStringView appName,
                             DelegateArgs&&... args) noexcept
       : ApplicationBase(appName),
-        ApplicationVulkan<PosixPipelineCacheFileManager, Delegate<App, Win>>(
-            appName),
+        ApplicationVulkan<PosixPipelineCacheFileManager>(appName),
         m_delegate(std::forward(args)...) {}
 
   bool pumpBuildPipelines() noexcept {
-    return this->pumpBuildVulkanPipelines(m_pcfm, m_delegate);
+    return this->pumpBuildVulkanPipelines(m_pcfm, static_cast<App&>(*this),
+                                          m_delegate);
   }
 };
 
