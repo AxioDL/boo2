@@ -41,6 +41,15 @@ public:
 
   void onWindowResize(App& a, typename Win::ID id,
                       const hsh::extent2d& extent) noexcept {}
+
+  void onUtf32Pressed(App& a, typename Win::ID id, uint32_t ch,
+                      KeyModifier mods) noexcept {}
+  void onUtf32Released(App& a, typename Win::ID id, uint32_t ch,
+                       KeyModifier mods) noexcept {}
+  void onSpecialKeyPressed(App& a, typename Win::ID id, Keycode key,
+                           KeyModifier mods) noexcept {}
+  void onSpecialKeyReleased(App& a, typename Win::ID id, Keycode key,
+                            KeyModifier mods) noexcept {}
 };
 
 } // namespace boo2

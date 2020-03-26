@@ -9,23 +9,6 @@
 
 namespace boo2 {
 
-class WindowBase {
-protected:
-  hsh::resource_owner<hsh::surface> m_surface;
-  WindowBase() noexcept = default;
-  WindowBase(WindowBase&& other) noexcept
-      : m_surface(std::move(other.m_surface)) {}
-  WindowBase& operator=(WindowBase&& other) {
-    m_surface = std::move(other.m_surface);
-    return *this;
-  }
-
-public:
-  bool acquireNextImage() noexcept { return m_surface.acquire_next_image(); }
-  hsh::surface getSurface() const noexcept { return m_surface.get(); }
-  operator hsh::surface() const noexcept { return getSurface(); }
-};
-
 class ApplicationBase {
 protected:
   SystemStringView m_appName;
@@ -121,5 +104,18 @@ protected:
 };
 
 #endif
+
+enum class Keycode {
+#define BOO2_SPECIAL_KEYCODE(name, code) name,
+#include "SpecialKeycodes.def"
+};
+
+enum class KeyModifier {
+  None = 0,
+  Control = 1,
+  Alt = 2,
+  Shift = 4
+};
+ENABLE_BITWISE_ENUM(KeyModifier)
 
 } // namespace boo2

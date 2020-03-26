@@ -6,8 +6,9 @@
 
 namespace boo2 {
 
-template <class Application> class WindowXcb : public WindowBase {
+template <class Application> class WindowXcb {
   friend Application;
+  hsh::resource_owner<hsh::surface> m_hshSurface;
   Application* m_parent = nullptr;
   xcb_window_t m_window = 0;
 
@@ -48,11 +49,9 @@ template <class Application> class WindowXcb : public WindowBase {
   bool createSurface(
       vk::UniqueSurfaceKHR&& physSurface,
       std::function<void(const hsh::extent2d&)>&& resizeLambda) noexcept {
-    xcb_connection_t* conn = *m_parent;
-    xcb_window_t win = m_window;
-    m_surface =
+    m_hshSurface =
         hsh::create_surface(std::move(physSurface), std::move(resizeLambda));
-    return m_surface.operator bool();
+    return m_hshSurface.operator bool();
   }
 
   operator xcb_window_t() const noexcept { return m_window; }
@@ -67,10 +66,10 @@ public:
 
   ~WindowXcb() noexcept {
     if (m_parent && m_window) {
-      if (m_surface) {
+      if (m_hshSurface) {
         xcb_connection_t* conn = *m_parent;
         xcb_window_t win = m_window;
-        m_surface.attach_deleter_lambda(
+        m_hshSurface.attach_deleter_lambda(
             [conn, win]() { xcb_destroy_window(conn, win); });
       } else {
         xcb_destroy_window(*m_parent, m_window);
@@ -79,14 +78,14 @@ public:
   }
 
   WindowXcb(WindowXcb&& other) noexcept
-      : WindowBase(std::move(other)), m_parent(other.m_parent),
+      : m_hshSurface(std::move(other.m_hshSurface)), m_parent(other.m_parent),
         m_window(other.m_window) {
     other.m_parent = nullptr;
     other.m_window = 0;
   }
 
   WindowXcb& operator=(WindowXcb&& other) noexcept {
-    WindowBase::operator=(std::move(other));
+    std::swap(m_hshSurface, other.m_hshSurface);
     std::swap(m_parent, other.m_parent);
     std::swap(m_window, other.m_window);
     return *this;
@@ -94,6 +93,10 @@ public:
 
   WindowXcb(const WindowXcb&) = delete;
   WindowXcb& operator=(const WindowXcb&) = delete;
+
+  bool acquireNextImage() noexcept { return m_hshSurface.acquire_next_image(); }
+  hsh::surface getSurface() const noexcept { return m_hshSurface.get(); }
+  operator hsh::surface() const noexcept { return getSurface(); }
 
   void show() noexcept {
     xcb_map_window(*m_parent, m_window);
@@ -113,6 +116,22 @@ public:
   }
 };
 
+struct XcbAtoms {
+#define BOO2_XCB_ATOM(atomname) xcb_atom_t m_##atomname;
+#include "XcbAtoms.def"
+  explicit XcbAtoms(xcb_connection_t* conn) noexcept {
+#define BOO2_XCB_ATOM(atomname)                                                \
+  xcb_intern_atom_cookie_t atomname##_cookie =                                 \
+      xcb_intern_atom(conn, 0, std::strlen(#atomname), #atomname);
+#include "XcbAtoms.def"
+#define BOO2_XCB_ATOM(atomname)                                                \
+  if (xcb_intern_atom_reply_t* reply =                                         \
+          xcb_intern_atom_reply(conn, atomname##_cookie, nullptr))             \
+    m_##atomname = reply->atom;
+#include "XcbAtoms.def"
+  }
+};
+
 template <template <class, class> class Delegate>
 class ApplicationXcb
     : public ApplicationPosix<ApplicationXcb<Delegate>,
@@ -124,21 +143,7 @@ class ApplicationXcb
   xcb_connection_t* m_conn;
   operator xcb_connection_t*() const noexcept { return m_conn; }
 
-  struct Atoms {
-#define BOO2_XCB_ATOM(atomname) xcb_atom_t m_##atomname;
-#include "XcbAtoms.def"
-    explicit Atoms(xcb_connection_t* conn) noexcept {
-#define BOO2_XCB_ATOM(atomname)                                                \
-  xcb_intern_atom_cookie_t atomname##_cookie =                                 \
-      xcb_intern_atom(conn, 0, std::strlen(#atomname), #atomname);
-#include "XcbAtoms.def"
-#define BOO2_XCB_ATOM(atomname)                                                \
-  if (xcb_intern_atom_reply_t* reply =                                         \
-          xcb_intern_atom_reply(conn, atomname##_cookie, nullptr))             \
-    m_##atomname = reply->atom;
-#include "XcbAtoms.def"
-    }
-  } m_atoms;
+  XcbAtoms m_atoms;
 
 public:
   [[nodiscard]] Window createWindow(SystemStringView title, int x, int y, int w,
