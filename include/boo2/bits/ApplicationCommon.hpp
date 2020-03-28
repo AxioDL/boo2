@@ -57,8 +57,9 @@ public:
   VulkanDevice(const VulkanInstance& instance, App& a, Delegate& delegate,
                vk::SurfaceKHR checkSurface = {}) noexcept
       : hsh::vulkan_device_owner(instance.enumerate_vulkan_devices(
-            [&](const vk::PhysicalDeviceProperties& props) {
-              return delegate.onAcceptDeviceRequest(a, props);
+            [&](const vk::PhysicalDeviceProperties& props,
+                const vk::PhysicalDeviceDriverProperties& driverProps) {
+              return delegate.onAcceptDeviceRequest(a, props, driverProps);
             },
             checkSurface)) {}
 };
@@ -110,12 +111,12 @@ enum class Keycode {
 #include "SpecialKeycodes.def"
 };
 
-enum class KeyModifier {
-  None = 0,
-  Control = 1,
-  Alt = 2,
-  Shift = 4
-};
+enum class KeyModifier { None = 0, Control = 1, Alt = 2, Shift = 4 };
 ENABLE_BITWISE_ENUM(KeyModifier)
+
+enum class MouseButton {
+#define BOO2_XBUTTON(name, xnum, wlnum) name,
+#include "XButtons.def"
+};
 
 } // namespace boo2

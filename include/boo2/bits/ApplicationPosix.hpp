@@ -5,6 +5,12 @@
 #include <cstdlib>
 #include <pwd.h>
 #include <unistd.h>
+#ifdef VK_USE_PLATFORM_XCB_KHR
+#include <xkbcommon/xkbcommon-x11.h>
+#define explicit mexplicit
+#include <xcb/xkb.h>
+#undef explicit
+#endif
 #include <xkbcommon/xkbcommon.h>
 
 namespace boo2 {
@@ -15,8 +21,27 @@ class XkbKeymap {
   xkb_state* m_keystate = nullptr;
   xkb_mod_index_t m_ctrlIdx = 0, m_altIdx = 0, m_shiftIdx = 0;
 
+  void _getMods(KeyModifier& mods) noexcept {
+    mods |= xkb_state_mod_index_is_active(m_keystate, m_ctrlIdx,
+                                          XKB_STATE_MODS_DEPRESSED) == 1
+                ? KeyModifier::Control
+                : KeyModifier::None;
+    mods |= xkb_state_mod_index_is_active(m_keystate, m_altIdx,
+                                          XKB_STATE_MODS_DEPRESSED) == 1
+                ? KeyModifier::Alt
+                : KeyModifier::None;
+    mods |= xkb_state_mod_index_is_active(m_keystate, m_shiftIdx,
+                                          XKB_STATE_MODS_DEPRESSED) == 1
+                ? KeyModifier::Shift
+                : KeyModifier::None;
+  }
+
 public:
+#ifdef VK_USE_PLATFORM_WAYLAND_KHR
   void setKeymap(const char* keymap, size_t size) noexcept {
+    if (m_keymap)
+      clear();
+
     m_keymap = xkb_keymap_new_from_buffer(
         m_xkbCtx, keymap, strnlen(keymap, size), XKB_KEYMAP_FORMAT_TEXT_V1,
         XKB_KEYMAP_COMPILE_NO_FLAGS);
@@ -28,6 +53,44 @@ public:
       m_keystate = xkb_state_new(m_keymap);
     }
   }
+#endif
+
+#ifdef VK_USE_PLATFORM_XCB_KHR
+  void setKeymap(xcb_connection_t* connection, uint8_t* baseEvent) noexcept {
+    if (m_keymap)
+      clear();
+
+    if (baseEvent) {
+      xkb_x11_setup_xkb_extension(connection, XKB_X11_MIN_MAJOR_XKB_VERSION,
+                                  XKB_X11_MIN_MINOR_XKB_VERSION,
+                                  XKB_X11_SETUP_XKB_EXTENSION_NO_FLAGS, nullptr,
+                                  nullptr, baseEvent, nullptr);
+      constexpr uint16_t eventMask = XCB_XKB_EVENT_TYPE_STATE_NOTIFY |
+                                     XCB_XKB_EVENT_TYPE_MAP_NOTIFY |
+                                     XCB_XKB_EVENT_TYPE_NEW_KEYBOARD_NOTIFY;
+      constexpr uint16_t maps =
+          XCB_XKB_MAP_PART_KEY_TYPES | XCB_XKB_MAP_PART_KEY_SYMS |
+          XCB_XKB_MAP_PART_MODIFIER_MAP | XCB_XKB_MAP_PART_EXPLICIT_COMPONENTS |
+          XCB_XKB_MAP_PART_KEY_ACTIONS | XCB_XKB_MAP_PART_KEY_BEHAVIORS |
+          XCB_XKB_MAP_PART_VIRTUAL_MODS | XCB_XKB_MAP_PART_VIRTUAL_MOD_MAP;
+      xcb_xkb_select_events_aux(connection, XCB_XKB_ID_USE_CORE_KBD, eventMask,
+                                0, eventMask, maps, maps, nullptr);
+    }
+
+    int32_t deviceId = xkb_x11_get_core_keyboard_device_id(connection);
+
+    m_keymap = xkb_x11_keymap_new_from_device(m_xkbCtx, connection, deviceId,
+                                              XKB_KEYMAP_COMPILE_NO_FLAGS);
+
+    if (m_keymap) {
+      m_ctrlIdx = xkb_keymap_mod_get_index(m_keymap, XKB_MOD_NAME_CTRL);
+      m_altIdx = xkb_keymap_mod_get_index(m_keymap, XKB_MOD_NAME_ALT);
+      m_shiftIdx = xkb_keymap_mod_get_index(m_keymap, XKB_MOD_NAME_SHIFT);
+      m_keystate =
+          xkb_x11_state_new_from_device(m_keymap, connection, deviceId);
+    }
+  }
+#endif
 
   void clear() noexcept {
     if (m_keystate) {
@@ -44,24 +107,13 @@ public:
       uint32_t key, const std::function<void(uint32_t, KeyModifier)>& utfFunc,
       const std::function<void(Keycode, KeyModifier)>& specialFunc) noexcept {
     if (m_keystate) {
-      uint32_t keysym = xkb_state_key_get_utf32(m_keystate, key + 8);
+      uint32_t keysym = xkb_state_key_get_utf32(m_keystate, key);
       KeyModifier mods = KeyModifier::None;
-      mods |= xkb_state_mod_index_is_active(m_keystate, m_ctrlIdx,
-                                            XKB_STATE_MODS_DEPRESSED) == 1
-                  ? KeyModifier::Control
-                  : KeyModifier::None;
-      mods |= xkb_state_mod_index_is_active(m_keystate, m_altIdx,
-                                            XKB_STATE_MODS_DEPRESSED) == 1
-                  ? KeyModifier::Alt
-                  : KeyModifier::None;
-      mods |= xkb_state_mod_index_is_active(m_keystate, m_shiftIdx,
-                                            XKB_STATE_MODS_DEPRESSED) == 1
-                  ? KeyModifier::Shift
-                  : KeyModifier::None;
+      _getMods(mods);
       if (keysym) {
         utfFunc(keysym, mods);
       } else {
-        switch (key) {
+        switch (key - 8) {
 #define BOO2_SPECIAL_KEYCODE(name, xkbcode)                                    \
   case xkbcode:                                                                \
     specialFunc(Keycode::name, mods);                                          \
@@ -74,6 +126,13 @@ public:
     }
   }
 
+  KeyModifier getMods() noexcept {
+    KeyModifier mods = KeyModifier::None;
+    if (m_keystate)
+      _getMods(mods);
+    return mods;
+  }
+
   void updateModifiers(uint32_t mods_depressed, uint32_t mods_latched,
                        uint32_t mods_locked, uint32_t group) noexcept {
     if (m_keystate) {
@@ -81,6 +140,16 @@ public:
                             mods_locked, group, group, group);
     }
   }
+
+#ifdef VK_USE_PLATFORM_XCB_KHR
+  void updateModifiers(xcb_xkb_state_notify_event_t* m) noexcept {
+    if (m_keystate) {
+      xkb_state_update_mask(m_keystate, m->baseMods, m->latchedMods,
+                            m->lockedMods, m->baseGroup, m->latchedGroup,
+                            m->lockedGroup);
+    }
+  }
+#endif
 
   XkbKeymap() noexcept { m_xkbCtx = xkb_context_new(XKB_CONTEXT_NO_FLAGS); }
 
@@ -208,7 +277,7 @@ protected:
                             DelegateArgs&&... args) noexcept
       : ApplicationBase(appName),
         ApplicationVulkan<PosixPipelineCacheFileManager>(appName),
-        m_delegate(std::forward(args)...) {}
+        m_delegate(std::forward<DelegateArgs>(args)...) {}
 
   bool pumpBuildPipelines() noexcept {
     return this->pumpBuildVulkanPipelines(m_pcfm, static_cast<App&>(*this),
@@ -237,11 +306,11 @@ public:
   static int exec(int argc, SystemChar** argv, SystemStringView appName,
                   DelegateArgs&&... args) noexcept {
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
-#if 1
+#if 0
     wl_log_set_handler_client(ApplicationWayland<Delegate>::wl_log_handler);
     if (wl_display* display = wl_display_connect(nullptr)) {
-      int ret = ApplicationWayland<Delegate>::exec(display, argc, argv, appName,
-                                                   std::forward(args)...);
+      int ret = ApplicationWayland<Delegate>::exec(
+          display, argc, argv, appName, std::forward<DelegateArgs>(args)...);
       wl_display_disconnect(display);
       return ret;
     }
@@ -250,8 +319,8 @@ public:
 
 #ifdef VK_USE_PLATFORM_XCB_KHR
     if (xcb_connection_t* conn = xcb_connect(nullptr, nullptr)) {
-      int ret = ApplicationXcb<Delegate>::exec(conn, argc, argv, appName,
-                                               std::forward(args)...);
+      int ret = ApplicationXcb<Delegate>::exec(
+          conn, argc, argv, appName, std::forward<DelegateArgs>(args)...);
       xcb_disconnect(conn);
       return ret;
     }

@@ -23,28 +23,29 @@ public:
   T* end() const { return (T*)((const char*)m_array->data + m_array->size); }
 };
 
-template <class Application> class WindowWayland;
+template <class App> class WindowWayland;
+template <class App> class WaylandApplicationObjs;
 
 template <class App> class WaylandWindowObjs {
   static constexpr int32_t MinDim = 128;
   static constexpr int32_t MaxDim = 16384;
   friend WindowWayland<App>;
+  friend WaylandApplicationObjs<App>;
   App* m_app;
   hsh::resource_owner<hsh::surface> hshSurface;
   wl_surface* wlSurface = nullptr;
   xdg_surface* xdgSurface = nullptr;
   xdg_toplevel* xdgToplevel = nullptr;
   zxdg_toplevel_decoration_v1* xdgDecoration = nullptr;
-  int32_t m_width = 128, m_height = 128;
+  int32_t m_width = MinDim, m_height = MinDim;
+  hsh::offset2dF m_currentMouse = {};
   bool m_fullscreen = false;
 
   static const xdg_surface_listener SurfaceListener;
   void xdg_surface_listener_configure(xdg_surface* xdg_surface,
                                       uint32_t serial) noexcept {
-    int32_t width = std::max(MinDim, std::min(MaxDim, m_width));
-    int32_t height = std::max(MinDim, std::min(MaxDim, m_height));
-    hshSurface.set_request_extent(hsh::extent2d(width, height));
-    xdg_surface_set_window_geometry(xdgSurface, 0, 0, width, height);
+    hshSurface.set_request_extent(hsh::extent2d(m_width, m_height));
+    xdg_surface_set_window_geometry(xdgSurface, 0, 0, m_width, m_height);
     xdg_surface_ack_configure(xdg_surface, serial);
     wl_surface_commit(wlSurface);
   }
@@ -61,8 +62,8 @@ template <class App> class WaylandWindowObjs {
                                        wl_array* states) noexcept {
     // for (auto state : WlArrayWrapper<xdg_toplevel_state>(states)) {}
     if (width != 0 || height != 0) {
-      m_width = width;
-      m_height = height;
+      m_width = std::max(MinDim, std::min(MaxDim, width));
+      m_height = std::max(MinDim, std::min(MaxDim, height));
     }
   }
   static void xdg_toplevel_listener_configure(void* data,
@@ -94,9 +95,43 @@ template <class App> class WaylandWindowObjs {
             zxdg_toplevel_decoration_v1, mode);
   }
 
+  void onMouseDown(MouseButton button) noexcept {
+    m_app->m_delegate.onMouseDown(*m_app, getWlSurface(), m_currentMouse,
+                                  button, m_app->m_wl.m_keymap.getMods());
+  }
+
+  void onMouseUp(MouseButton button) noexcept {
+    m_app->m_delegate.onMouseUp(*m_app, getWlSurface(), m_currentMouse, button,
+                                m_app->m_wl.m_keymap.getMods());
+  }
+
+  void onMouseMove(const hsh::offset2dF& offset) noexcept {
+    m_currentMouse = offset;
+    m_app->m_delegate.onMouseMove(*m_app, getWlSurface(), m_currentMouse,
+                                  m_app->m_wl.m_keymap.getMods());
+  }
+
+  void onScroll(const hsh::offset2dF& delta) noexcept {
+    m_app->m_delegate.onScroll(*m_app, getWlSurface(), delta,
+                               m_app->m_wl.m_keymap.getMods());
+  }
+
+  void onMouseEnter() noexcept {
+    m_app->m_delegate.onMouseEnter(*m_app, getWlSurface(), m_currentMouse,
+                                   m_app->m_wl.m_keymap.getMods());
+  }
+
+  void onMouseLeave() noexcept {
+    m_app->m_delegate.onMouseLeave(*m_app, getWlSurface(), m_currentMouse,
+                                   m_app->m_wl.m_keymap.getMods());
+  }
+
 public:
-  explicit WaylandWindowObjs(App* a, int32_t width, int32_t height) noexcept
-      : m_app(a), m_width(width), m_height(height) {
+  explicit WaylandWindowObjs(App* a, int& width, int& height) noexcept
+      : m_app(a), m_width(std::max(MinDim, std::min(MaxDim, width))),
+        m_height(std::max(MinDim, std::min(MaxDim, height))) {
+    width = m_width;
+    height = m_height;
     wlSurface = wl_compositor_create_surface(a->m_registry.m_wl_compositor);
     xdgSurface =
         xdg_wm_base_get_xdg_surface(a->m_registry.m_xdg_wm_base, wlSurface);
@@ -112,6 +147,7 @@ public:
                                                &DecorationListener, this);
     xdg_toplevel_set_min_size(xdgToplevel, MinDim, MinDim);
     xdg_toplevel_set_max_size(xdgToplevel, MaxDim, MaxDim);
+    xdg_surface_set_window_geometry(xdgSurface, 0, 0, m_width, m_height);
   }
 
   ~WaylandWindowObjs() noexcept {
@@ -163,7 +199,7 @@ template <class Application> class WindowWayland {
   WaylandWindowObjs<Application>* m_wl = nullptr;
 
   explicit WindowWayland(Application* parent, SystemStringView title, int x,
-                         int y, int w, int h) noexcept
+                         int y, int& w, int& h) noexcept
       : m_wl(new WaylandWindowObjs<Application>(parent, w, h)) {
     xdg_toplevel_set_title(*m_wl, title.data());
   }
@@ -212,14 +248,14 @@ public:
   bool acquireNextImage() noexcept {
     return m_wl->hshSurface.acquire_next_image();
   }
-  hsh::surface getSurface() const noexcept { return m_wl->hshSurface.get(); }
+  hsh::surface getSurface() const noexcept {
+    return m_wl ? m_wl->hshSurface.get() : hsh::surface{};
+  }
   operator hsh::surface() const noexcept { return getSurface(); }
 
-  void show() noexcept {}
-
-  void hide() noexcept {}
-
-  void setTitle(SystemStringView title) noexcept {}
+  void setTitle(SystemStringView title) noexcept {
+    xdg_toplevel_set_title(*m_wl, title.data());
+  }
 };
 
 struct WaylandRegistry {
@@ -239,11 +275,11 @@ struct WaylandRegistry {
   }
 #include "WaylandRegistryEntries.def"
   }
-  static void _RegistryHandler(WaylandRegistry* data,
-                               struct wl_registry* registry, uint32_t id,
-                               const char* interface,
+  static void _RegistryHandler(void* data, struct wl_registry* registry,
+                               uint32_t id, const char* interface,
                                uint32_t version) noexcept {
-    data->RegistryHandler(registry, id, interface, version);
+    reinterpret_cast<WaylandRegistry*>(data)->RegistryHandler(
+        registry, id, interface, version);
   }
 
   void RegistryRemover(struct wl_registry* registry, uint32_t id) noexcept {
@@ -255,10 +291,9 @@ struct WaylandRegistry {
   }
 #include "WaylandRegistryEntries.def"
   }
-  static void _RegistryRemover(WaylandRegistry* data,
-                               struct wl_registry* registry,
+  static void _RegistryRemover(void* data, struct wl_registry* registry,
                                uint32_t id) noexcept {
-    data->RegistryRemover(registry, id);
+    reinterpret_cast<WaylandRegistry*>(data)->RegistryRemover(registry, id);
   }
 
   static const wl_registry_listener Listener;
@@ -270,15 +305,14 @@ struct WaylandRegistry {
   }
 };
 
-const wl_registry_listener WaylandRegistry::Listener = {
-    (void (*)(void* data, struct wl_registry* wl_registry, uint32_t name,
-              const char* interface, uint32_t version))_RegistryHandler,
-    (void (*)(void* data, struct wl_registry* wl_registry,
-              uint32_t name))_RegistryRemover};
+const wl_registry_listener WaylandRegistry::Listener = {_RegistryHandler,
+                                                        _RegistryRemover};
 
 template <class App> class WaylandApplicationObjs {
   friend App;
-  App* m_app;
+  friend WaylandWindowObjs<App>;
+  App* m_app = nullptr;
+  WaylandWindowObjs<App>* m_pointerWindow = nullptr;
   WaylandWindowObjs<App>* m_kbWindow = nullptr;
   wl_pointer* wlPointer = nullptr;
   wl_keyboard* wlKeyboard = nullptr;
@@ -299,7 +333,13 @@ template <class App> class WaylandApplicationObjs {
   void wl_pointer_listener_enter(struct wl_pointer* wl_pointer, uint32_t serial,
                                  struct wl_surface* surface,
                                  wl_fixed_t surface_x,
-                                 wl_fixed_t surface_y) noexcept {}
+                                 wl_fixed_t surface_y) noexcept {
+    if (auto* windowObjs =
+            (WaylandWindowObjs<App>*)wl_surface_get_user_data(surface)) {
+      m_pointerWindow = windowObjs;
+      m_pointerWindow->onMouseEnter();
+    }
+  }
   static void wl_pointer_listener_enter(void* data,
                                         struct wl_pointer* wl_pointer,
                                         uint32_t serial,
@@ -311,7 +351,14 @@ template <class App> class WaylandApplicationObjs {
   }
 
   void wl_pointer_listener_leave(struct wl_pointer* wl_pointer, uint32_t serial,
-                                 struct wl_surface* surface) noexcept {}
+                                 struct wl_surface* surface) noexcept {
+    if (auto* windowObjs =
+            (WaylandWindowObjs<App>*)wl_surface_get_user_data(surface))
+      if (m_pointerWindow == windowObjs) {
+        m_pointerWindow->onMouseLeave();
+        m_pointerWindow = nullptr;
+      }
+  }
   static void wl_pointer_listener_leave(void* data,
                                         struct wl_pointer* wl_pointer,
                                         uint32_t serial,
@@ -322,7 +369,11 @@ template <class App> class WaylandApplicationObjs {
 
   void wl_pointer_listener_motion(struct wl_pointer* wl_pointer, uint32_t time,
                                   wl_fixed_t surface_x,
-                                  wl_fixed_t surface_y) noexcept {}
+                                  wl_fixed_t surface_y) noexcept {
+    if (m_pointerWindow)
+      m_pointerWindow->onMouseMove(hsh::offset2dF(
+          wl_fixed_to_double(surface_x), wl_fixed_to_double(surface_y)));
+  }
   static void wl_pointer_listener_motion(void* data,
                                          struct wl_pointer* wl_pointer,
                                          uint32_t time, wl_fixed_t surface_x,
@@ -333,7 +384,31 @@ template <class App> class WaylandApplicationObjs {
 
   void wl_pointer_listener_button(struct wl_pointer* wl_pointer,
                                   uint32_t serial, uint32_t time,
-                                  uint32_t button, uint32_t state) noexcept {}
+                                  uint32_t button, uint32_t state) noexcept {
+    if (m_pointerWindow) {
+      if (state == WL_POINTER_BUTTON_STATE_PRESSED) {
+        switch (button) {
+#define BOO2_XBUTTON(name, xnum, wlnum)                                        \
+  case wlnum:                                                                  \
+    m_pointerWindow->onMouseDown(MouseButton::name);                           \
+    break;
+#include "XButtons.def"
+        default:
+          break;
+        }
+      } else {
+        switch (button) {
+#define BOO2_XBUTTON(name, xnum, wlnum)                                        \
+  case wlnum:                                                                  \
+    m_pointerWindow->onMouseUp(MouseButton::name);                             \
+    break;
+#include "XButtons.def"
+        default:
+          break;
+        }
+      }
+    }
+  }
   static void wl_pointer_listener_button(void* data,
                                          struct wl_pointer* wl_pointer,
                                          uint32_t serial, uint32_t time,
@@ -344,7 +419,16 @@ template <class App> class WaylandApplicationObjs {
   }
 
   void wl_pointer_listener_axis(struct wl_pointer* wl_pointer, uint32_t time,
-                                uint32_t axis, wl_fixed_t value) noexcept {}
+                                uint32_t axis, wl_fixed_t value) noexcept {
+    if (m_pointerWindow) {
+      if (axis == WL_POINTER_AXIS_HORIZONTAL_SCROLL)
+        m_pointerWindow->onScroll(
+            hsh::offset2dF(wl_fixed_to_double(value), 0.0));
+      else
+        m_pointerWindow->onScroll(
+            hsh::offset2dF(0.0, wl_fixed_to_double(value)));
+    }
+  }
   static void wl_pointer_listener_axis(void* data,
                                        struct wl_pointer* wl_pointer,
                                        uint32_t time, uint32_t axis,
@@ -453,25 +537,25 @@ template <class App> class WaylandApplicationObjs {
                                 uint32_t state) noexcept {
     if (state == WL_KEYBOARD_KEY_STATE_PRESSED)
       m_keymap.translateKey(
-          key,
-          [a = m_app, w = m_kbWindow, state](uint32_t sym, KeyModifier mods) {
+          key + 8,
+          [a = m_app, w = m_kbWindow](uint32_t sym, KeyModifier mods) {
             if (sym == '\r' && (mods & KeyModifier::Alt) != KeyModifier::None)
               w->toggleFullscreen();
             a->m_delegate.onUtf32Pressed(*a, w ? w->getWlSurface() : nullptr,
                                          sym, mods);
           },
-          [a = m_app, w = m_kbWindow, state](Keycode code, KeyModifier mods) {
+          [a = m_app, w = m_kbWindow](Keycode code, KeyModifier mods) {
             a->m_delegate.onSpecialKeyPressed(
                 *a, w ? w->getWlSurface() : nullptr, code, mods);
           });
     else
       m_keymap.translateKey(
-          key,
-          [a = m_app, w = m_kbWindow, state](uint32_t sym, KeyModifier mods) {
+          key + 8,
+          [a = m_app, w = m_kbWindow](uint32_t sym, KeyModifier mods) {
             a->m_delegate.onUtf32Released(*a, w ? w->getWlSurface() : nullptr,
                                           sym, mods);
           },
-          [a = m_app, w = m_kbWindow, state](Keycode code, KeyModifier mods) {
+          [a = m_app, w = m_kbWindow](Keycode code, KeyModifier mods) {
             a->m_delegate.onSpecialKeyReleased(
                 *a, w ? w->getWlSurface() : nullptr, code, mods);
           });
@@ -512,11 +596,13 @@ template <class App> class WaylandApplicationObjs {
   }
 
 public:
-  explicit WaylandApplicationObjs(App* a) noexcept : m_app(a) {
-    xdg_wm_base_add_listener(a->m_registry.m_xdg_wm_base, &WmBaseListener,
+  explicit WaylandApplicationObjs(App* a) noexcept : m_app(a) {}
+
+  void setup() noexcept {
+    xdg_wm_base_add_listener(m_app->m_registry.m_xdg_wm_base, &WmBaseListener,
                              this);
-    wlPointer = wl_seat_get_pointer(a->m_registry.m_wl_seat);
-    wlKeyboard = wl_seat_get_keyboard(a->m_registry.m_wl_seat);
+    wlPointer = wl_seat_get_pointer(m_app->m_registry.m_wl_seat);
+    wlKeyboard = wl_seat_get_keyboard(m_app->m_registry.m_wl_seat);
 
     if (wlPointer)
       wl_pointer_add_listener(wlPointer, &PointerListener, this);
@@ -566,10 +652,17 @@ class ApplicationWayland
   operator wl_display*() const noexcept { return m_display; }
 
   WaylandRegistry m_registry;
+  WaylandApplicationObjs<ApplicationWayland<Delegate>> m_wl{this};
+
+  bool m_builtWindow = false;
 
 public:
   [[nodiscard]] Window createWindow(SystemStringView title, int x, int y, int w,
                                     int h) noexcept {
+    if (m_builtWindow)
+      Log.report(logvisor::Fatal,
+                 fmt("boo2 currently only supports one window"));
+
     Window window(this, title, x, y, w, h);
     if (!window)
       return {};
@@ -603,6 +696,11 @@ public:
       return {};
     }
 
+    wl_surface_commit(windowId);
+    wl_display_dispatch(m_display);
+    wl_display_roundtrip(m_display);
+
+    m_builtWindow = true;
     return window;
   }
 
@@ -680,7 +778,7 @@ private:
       return 1;
     }
 
-    WaylandApplicationObjs<ApplicationWayland<Delegate>> Objs(this);
+    m_wl.setup();
 
     if (!this->m_instance)
       return 1;
@@ -708,7 +806,7 @@ private:
                               DelegateArgs&&... args) noexcept
       : ApplicationPosix<ApplicationWayland<Delegate>,
                          WindowWayland<ApplicationWayland<Delegate>>, Delegate>(
-            appName, std::forward(args)...),
+            appName, std::forward<DelegateArgs>(args)...),
         m_display(display), m_registry(display) {}
 
 public:
@@ -720,12 +818,15 @@ public:
   template <typename... DelegateArgs>
   static int exec(wl_display* display, int argc, SystemChar** argv,
                   SystemStringView appName, DelegateArgs&&... args) noexcept {
-    ApplicationWayland app(display, appName, std::forward(args)...);
+    ApplicationWayland app(display, appName,
+                           std::forward<DelegateArgs>(args)...);
     return app.run(argc, argv);
   }
 
   static void wl_log_handler(const char* format, va_list arg) {
+#ifndef NDEBUG
     vfprintf(stderr, format, arg);
+#endif
   }
 };
 template <template <class, class> class Delegate>

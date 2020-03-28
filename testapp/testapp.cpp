@@ -16,7 +16,6 @@ public:
     std::cout << "launch" << std::endl;
     m_window = a.createWindow(_SYS_STR("Hello World!"sv), 0, 0, 512, 512);
     m_renderTexture = hsh::create_render_texture2d(m_window);
-    m_window.show();
   }
 
   void onAppIdle(App& a) noexcept {
@@ -30,11 +29,12 @@ public:
     UniData.xf[3][3] = 1.f;
     PipelineBind.Uniform.load(UniData);
 
-    m_window.acquireNextImage();
-    m_renderTexture.attach();
-    hsh::clear_attachments();
-    PipelineBind.Binding.draw(0, 3);
-    m_renderTexture.resolve_surface(m_window);
+    if (m_window.acquireNextImage()) {
+      m_renderTexture.attach();
+      hsh::clear_attachments();
+      PipelineBind.Binding.draw(0, 3);
+      m_renderTexture.resolve_surface(m_window);
+    }
   }
 
   void onAppExiting(App& a) noexcept { std::cout << "exiting" << std::endl; }
@@ -45,21 +45,29 @@ public:
   }
 
 #if HSH_ENABLE_VULKAN
-  bool
-  onAcceptDeviceRequest(App& a, const vk::PhysicalDeviceProperties& props) noexcept {
-    return true;
+  bool onAcceptDeviceRequest(
+      App& a, const vk::PhysicalDeviceProperties& props,
+      const vk::PhysicalDeviceDriverProperties& driverProps) noexcept {
+    if (driverProps.driverID == vk::DriverId::eMesaRadv)
+      return true;
+    //if (driverProps.driverID == vk::DriverId::eAmdOpenSource)
+    //  return true;
+    return false;
   }
 #endif
 
-  void onStartBuildPipelines(App& a, std::size_t done, std::size_t count) noexcept {
+  void onStartBuildPipelines(App& a, std::size_t done,
+                             std::size_t count) noexcept {
     std::cout << "start " << done << "/" << count << std::endl;
   }
 
-  void onUpdateBuildPipelines(App& a, std::size_t done, std::size_t count) noexcept {
+  void onUpdateBuildPipelines(App& a, std::size_t done,
+                              std::size_t count) noexcept {
     std::cout << "update " << done << "/" << count << std::endl;
   }
 
-  void onEndBuildPipelines(App& a, std::size_t done, std::size_t count) noexcept {
+  void onEndBuildPipelines(App& a, std::size_t done,
+                           std::size_t count) noexcept {
     std::cout << "end " << done << "/" << count << std::endl;
   }
 

@@ -4,6 +4,8 @@
 #error May only be included by ApplicationPosix.hpp
 #endif
 
+#include <xcb/xcb_atom.h>
+
 namespace boo2 {
 
 template <class Application> class WindowXcb {
@@ -31,7 +33,12 @@ template <class Application> class WindowXcb {
     }
 
     uint32_t EventMask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
-    uint32_t ValueList[] = {screen.data->black_pixel, 0};
+    uint32_t ValueList[] = {
+        screen.data->black_pixel,
+        XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
+            XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE |
+            XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_ENTER_WINDOW |
+            XCB_EVENT_MASK_LEAVE_WINDOW};
     xcb_create_window(*m_parent, XCB_COPY_FROM_PARENT, m_window,
                       screen.data->root, x, y, w, h, 0,
                       XCB_WINDOW_CLASS_INPUT_OUTPUT, screen.data->root_visual,
@@ -98,16 +105,6 @@ public:
   hsh::surface getSurface() const noexcept { return m_hshSurface.get(); }
   operator hsh::surface() const noexcept { return getSurface(); }
 
-  void show() noexcept {
-    xcb_map_window(*m_parent, m_window);
-    m_parent->flushLater();
-  }
-
-  void hide() noexcept {
-    xcb_unmap_window(*m_parent, m_window);
-    m_parent->flushLater();
-  }
-
   void setTitle(SystemStringView title) noexcept {
     xcb_change_property(*m_parent, XCB_PROP_MODE_REPLACE, m_window,
                         XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, title.size(),
@@ -132,6 +129,21 @@ struct XcbAtoms {
   }
 };
 
+template <typename T> class XcbReplyWrapper {
+  xcb_get_property_reply_t* m_reply;
+
+public:
+  XcbReplyWrapper(xcb_get_property_reply_t* reply) noexcept : m_reply(reply) {
+    if (!m_reply)
+      return;
+    assert(sizeof(T) == m_reply->format / 8 && "reply format mismatch");
+  }
+  ~XcbReplyWrapper() noexcept { free(m_reply); }
+  operator bool() const noexcept { return m_reply != nullptr; }
+  T* begin() const noexcept { return (T*)(m_reply + 1); }
+  T* end() const noexcept { return begin() + m_reply->value_len; }
+};
+
 template <template <class, class> class Delegate>
 class ApplicationXcb
     : public ApplicationPosix<ApplicationXcb<Delegate>,
@@ -144,10 +156,51 @@ class ApplicationXcb
   operator xcb_connection_t*() const noexcept { return m_conn; }
 
   XcbAtoms m_atoms;
+  XkbKeymap m_keymap;
+  uint8_t m_xkbBaseEvent = 0;
+
+  void setFullscreen(xcb_window_t window, bool fs) noexcept {
+    union {
+      xcb_client_message_event_t event = {};
+      xcb_raw_generic_event_t pad;
+    };
+    event.response_type = XCB_CLIENT_MESSAGE;
+    event.format = 32;
+    event.window = window;
+    event.type = m_atoms.m__NET_WM_STATE;
+    event.data.data32[0] = fs ? 1 : 0;
+    event.data.data32[1] = m_atoms.m__NET_WM_STATE_FULLSCREEN;
+    xcb_send_event(m_conn, true, window,
+                   XCB_EVENT_MASK_STRUCTURE_NOTIFY |
+                       XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
+                   (char*)&event);
+  }
+
+  void toggleFullscreen(xcb_window_t window) noexcept {
+    xcb_get_property_cookie_t cookie =
+        xcb_get_property(m_conn, 0, window, m_atoms.m__NET_WM_STATE,
+                         XCB_ATOM_ATOM, 0, UINT32_MAX);
+    if (XcbReplyWrapper<xcb_atom_t> reply =
+            xcb_get_property_reply(m_conn, cookie, nullptr)) {
+      for (auto atom : reply) {
+        if (atom == m_atoms.m__NET_WM_STATE_FULLSCREEN) {
+          setFullscreen(window, false);
+          return;
+        }
+      }
+    }
+    setFullscreen(window, true);
+  }
+
+  bool m_builtWindow = false;
 
 public:
   [[nodiscard]] Window createWindow(SystemStringView title, int x, int y, int w,
                                     int h) noexcept {
+    if (m_builtWindow)
+      Log.report(logvisor::Fatal,
+                 fmt("boo2 currently only supports one window"));
+
     Window window(this, title, x, y, w, h);
     if (!window)
       return {};
@@ -179,6 +232,10 @@ public:
       return {};
     }
 
+    xcb_map_window(m_conn, window);
+    flushLater();
+
+    m_builtWindow = true;
     return window;
   }
 
@@ -193,6 +250,8 @@ private:
   int run(int argc, SystemChar** argv) noexcept {
     if (!this->m_instance)
       return 1;
+
+    m_keymap.setKeymap(m_conn, &m_xkbBaseEvent);
 
     this->m_delegate.onAppLaunched(*this);
 
@@ -215,19 +274,116 @@ private:
         continue;
       }
 
-      switch (event->response_type & ~0x80u) {
+      uint8_t opcode = event->response_type & ~0x80u;
+      switch (opcode) {
+      case XCB_KEY_PRESS: {
+        auto* m = (xcb_key_press_event_t*)event;
+        m_keymap.translateKey(
+            m->detail,
+            [a = this, w = m->event](uint32_t sym, KeyModifier mods) {
+              if (sym == '\r' && (mods & KeyModifier::Alt) != KeyModifier::None)
+                a->toggleFullscreen(w);
+              a->m_delegate.onUtf32Pressed(*a, w, sym, mods);
+            },
+            [a = this, w = m->event](Keycode code, KeyModifier mods) {
+              a->m_delegate.onSpecialKeyPressed(*a, w, code, mods);
+            });
+        break;
+      }
+      case XCB_KEY_RELEASE: {
+        auto* m = (xcb_key_release_event_t*)event;
+        m_keymap.translateKey(
+            m->detail,
+            [a = this, w = m->event](uint32_t sym, KeyModifier mods) {
+              a->m_delegate.onUtf32Released(*a, w, sym, mods);
+            },
+            [a = this, w = m->event](Keycode code, KeyModifier mods) {
+              a->m_delegate.onSpecialKeyReleased(*a, w, code, mods);
+            });
+        break;
+      }
+      case XCB_BUTTON_PRESS: {
+        auto* m = (xcb_button_press_event_t*)event;
+        switch (m->detail) {
+#define BOO2_XBUTTON(name, xnum, wlnum)                                        \
+  case xnum:                                                                   \
+    this->m_delegate.onMouseDown(*this, m->event,                              \
+                                 hsh::offset2d(m->event_x, m->event_y),        \
+                                 MouseButton::name, m_keymap.getMods());       \
+    break;
+#define BOO2_XBUTTON_SCROLL(x, y, xnum)                                        \
+  case xnum:                                                                   \
+    this->m_delegate.onScroll(*this, m->event, hsh::offset2d(x, y),            \
+                              m_keymap.getMods());                             \
+    break;
+#include "XButtons.def"
+        default:
+          break;
+        }
+        break;
+      }
+      case XCB_BUTTON_RELEASE: {
+        auto* m = (xcb_button_release_event_t*)event;
+        switch (m->detail) {
+#define BOO2_XBUTTON(name, xnum, wlnum)                                        \
+  case xnum:                                                                   \
+    this->m_delegate.onMouseUp(*this, m->event,                                \
+                               hsh::offset2d(m->event_x, m->event_y),          \
+                               MouseButton::name, m_keymap.getMods());         \
+    break;
+#include "XButtons.def"
+        default:
+          break;
+        }
+        break;
+      }
+      case XCB_MOTION_NOTIFY: {
+        auto* m = (xcb_motion_notify_event_t*)event;
+        this->m_delegate.onMouseMove(*this, m->event,
+                                     hsh::offset2d(m->event_x, m->event_y),
+                                     m_keymap.getMods());
+        break;
+      }
+      case XCB_ENTER_NOTIFY: {
+        auto* m = (xcb_enter_notify_event_t*)event;
+        if (m->mode == XCB_NOTIFY_MODE_NORMAL)
+          this->m_delegate.onMouseEnter(*this, m->event,
+                                        hsh::offset2d(m->event_x, m->event_y),
+                                        m_keymap.getMods());
+        break;
+      }
+      case XCB_LEAVE_NOTIFY: {
+        auto* m = (xcb_leave_notify_event_t*)event;
+        if (m->mode == XCB_NOTIFY_MODE_NORMAL)
+          this->m_delegate.onMouseLeave(*this, m->event,
+                                        hsh::offset2d(m->event_x, m->event_y),
+                                        m_keymap.getMods());
+        break;
+      }
       case XCB_CLIENT_MESSAGE: {
-        auto* cm = (xcb_client_message_event_t*)event;
-
-        if (cm->data.data32[0] == m_atoms.m_WM_DELETE_WINDOW)
+        auto* m = (xcb_client_message_event_t*)event;
+        if (m->data.data32[0] == m_atoms.m_WM_DELETE_WINDOW)
           this->m_delegate.onQuitRequest(*this);
-
         break;
       }
       default:
+        if (opcode == m_xkbBaseEvent) {
+          switch (event->pad0) {
+          case XCB_XKB_NEW_KEYBOARD_NOTIFY:
+          case XCB_XKB_MAP_NOTIFY: {
+            m_keymap.setKeymap(m_conn, nullptr);
+            break;
+          }
+          case XCB_XKB_STATE_NOTIFY: {
+            m_keymap.updateModifiers((xcb_xkb_state_notify_event_t*)event);
+            break;
+          }
+          default:
+            break;
+          }
+        }
         break;
       }
-
       free(event);
     }
 
@@ -240,7 +396,7 @@ private:
                           DelegateArgs&&... args) noexcept
       : ApplicationPosix<ApplicationXcb<Delegate>,
                          WindowXcb<ApplicationXcb<Delegate>>, Delegate>(
-            appName, std::forward(args)...),
+            appName, std::forward<DelegateArgs>(args)...),
         m_conn(conn), m_atoms(conn) {}
 
 public:
@@ -252,7 +408,7 @@ public:
   template <typename... DelegateArgs>
   static int exec(xcb_connection_t* conn, int argc, SystemChar** argv,
                   SystemStringView appName, DelegateArgs&&... args) noexcept {
-    ApplicationXcb app(conn, appName, std::forward(args)...);
+    ApplicationXcb app(conn, appName, std::forward<DelegateArgs>(args)...);
     return app.run(argc, argv);
   }
 };

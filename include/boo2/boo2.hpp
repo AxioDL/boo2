@@ -25,9 +25,9 @@ public:
   void onQuitRequest(App& a) noexcept { a.quit(); }
 
 #if HSH_ENABLE_VULKAN
-  bool
-  onAcceptDeviceRequest(App& a,
-                        const vk::PhysicalDeviceProperties& props) noexcept {
+  bool onAcceptDeviceRequest(
+      App& a, const vk::PhysicalDeviceProperties& props,
+      const vk::PhysicalDeviceDriverProperties& driverProps) noexcept {
     return true;
   }
 #endif
@@ -50,6 +50,20 @@ public:
                            KeyModifier mods) noexcept {}
   void onSpecialKeyReleased(App& a, typename Win::ID id, Keycode key,
                             KeyModifier mods) noexcept {}
+
+  void onMouseDown(App& a, typename Win::ID id, const hsh::offset2dF& offset,
+                   MouseButton button, KeyModifier mods) noexcept {}
+  void onMouseUp(App& a, typename Win::ID id, const hsh::offset2dF& offset,
+                 MouseButton button, KeyModifier mods) noexcept {}
+  void onMouseMove(App& a, typename Win::ID id, const hsh::offset2dF& offset,
+                   KeyModifier mods) noexcept {}
+  void onScroll(App& a, typename Win::ID id, const hsh::offset2dF& delta,
+                KeyModifier mods) noexcept {}
+
+  void onMouseEnter(App& a, typename Win::ID id, const hsh::offset2dF& offset,
+                    KeyModifier mods) noexcept {}
+  void onMouseLeave(App& a, typename Win::ID id, const hsh::offset2dF& offset,
+                    KeyModifier mods) noexcept {}
 };
 
 } // namespace boo2
