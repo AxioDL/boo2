@@ -10,7 +10,7 @@ namespace boo2 {
 
 template <class Application> class WindowXcb {
   friend Application;
-  hsh::resource_owner<hsh::surface> m_hshSurface;
+  hsh::owner<hsh::surface> m_hshSurface;
   Application* m_parent = nullptr;
   xcb_window_t m_window = 0;
 
@@ -247,7 +247,7 @@ private:
   bool m_buildingPipelines = false;
   void flushLater() noexcept { m_pendingFlush = true; }
 
-  int run(int argc, SystemChar** argv) noexcept {
+  int run() noexcept {
     if (!this->m_instance)
       return 1;
 
@@ -392,11 +392,12 @@ private:
   }
 
   template <typename... DelegateArgs>
-  explicit ApplicationXcb(xcb_connection_t* conn, SystemStringView appName,
+  explicit ApplicationXcb(xcb_connection_t* conn, int argc, SystemChar** argv,
+                          SystemStringView appName,
                           DelegateArgs&&... args) noexcept
       : ApplicationPosix<ApplicationXcb<Delegate>,
                          WindowXcb<ApplicationXcb<Delegate>>, Delegate>(
-            appName, std::forward<DelegateArgs>(args)...),
+            argc, argv, appName, std::forward<DelegateArgs>(args)...),
         m_conn(conn), m_atoms(conn) {}
 
 public:
@@ -408,8 +409,9 @@ public:
   template <typename... DelegateArgs>
   static int exec(xcb_connection_t* conn, int argc, SystemChar** argv,
                   SystemStringView appName, DelegateArgs&&... args) noexcept {
-    ApplicationXcb app(conn, appName, std::forward<DelegateArgs>(args)...);
-    return app.run(argc, argv);
+    ApplicationXcb app(conn, argc, argv, appName,
+                       std::forward<DelegateArgs>(args)...);
+    return app.run();
   }
 };
 template <template <class, class> class Delegate>

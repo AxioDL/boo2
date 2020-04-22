@@ -183,7 +183,7 @@ class XdgPaths {
       return envLookup;
 
     if (const char* home = getHome())
-      return fmt::format(fmt("{}/{}"), home, def);
+      return fmt::format(FMT_STRING("{}/{}"), home, def);
 
     return {};
   }
@@ -196,15 +196,15 @@ public:
   }
 
   SystemString getConfigPath(SystemStringView subPath) const noexcept {
-    return fmt::format(fmt("{}/{}"), m_config, subPath);
+    return fmt::format(FMT_STRING("{}/{}"), m_config, subPath);
   }
 
   SystemString getDataPath(SystemStringView subPath) const noexcept {
-    return fmt::format(fmt("{}/{}"), m_config, subPath);
+    return fmt::format(FMT_STRING("{}/{}"), m_config, subPath);
   }
 
   SystemString getCachePath(SystemStringView subPath) const noexcept {
-    return fmt::format(fmt("{}/{}"), m_config, subPath);
+    return fmt::format(FMT_STRING("{}/{}"), m_config, subPath);
   }
 };
 
@@ -271,9 +271,10 @@ protected:
   PosixPipelineCacheFileManager m_pcfm{m_xdgPaths};
 
   template <typename... DelegateArgs>
-  explicit ApplicationPosix(SystemStringView appName,
+  explicit ApplicationPosix(int argc, SystemChar** argv,
+                            SystemStringView appName,
                             DelegateArgs&&... args) noexcept
-      : ApplicationBase(appName),
+      : ApplicationBase(argc, argv, appName),
         ApplicationVulkan<PosixPipelineCacheFileManager>(appName),
         m_delegate(std::forward<DelegateArgs>(args)...) {}
 
