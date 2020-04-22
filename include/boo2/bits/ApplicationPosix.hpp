@@ -39,8 +39,7 @@ class XkbKeymap {
 public:
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
   void setKeymap(const char* keymap, size_t size) noexcept {
-    if (m_keymap)
-      clear();
+    clear();
 
     m_keymap = xkb_keymap_new_from_buffer(
         m_xkbCtx, keymap, strnlen(keymap, size), XKB_KEYMAP_FORMAT_TEXT_V1,
@@ -57,8 +56,7 @@ public:
 
 #ifdef VK_USE_PLATFORM_XCB_KHR
   void setKeymap(xcb_connection_t* connection, uint8_t* baseEvent) noexcept {
-    if (m_keymap)
-      clear();
+    clear();
 
     if (baseEvent) {
       xkb_x11_setup_xkb_extension(connection, XKB_X11_MIN_MAJOR_XKB_VERSION,

@@ -601,6 +601,7 @@ public:
   void setup() noexcept {
     xdg_wm_base_add_listener(m_app->m_registry.m_xdg_wm_base, &WmBaseListener,
                              this);
+    // TODO: These must be done via changed capabilities
     wlPointer = wl_seat_get_pointer(m_app->m_registry.m_wl_seat);
     wlKeyboard = wl_seat_get_keyboard(m_app->m_registry.m_wl_seat);
 
