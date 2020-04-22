@@ -239,8 +239,8 @@ struct PosixPipelineCacheFileManager {
       }
       std::fclose(File);
     } else {
-      Log.report(logvisor::Warning, fmt("Unable to open {} for reading."),
-                 path);
+      Log.report(logvisor::Warning,
+                 FMT_STRING("Unable to open {} for reading."), path);
     }
   }
 
@@ -253,12 +253,12 @@ struct PosixPipelineCacheFileManager {
       });
       std::fclose(File);
     } else {
-      Log.report(logvisor::Warning, fmt("Unable to open {} for writing."),
-                 path);
+      Log.report(logvisor::Warning,
+                 FMT_STRING("Unable to open {} for writing."), path);
     }
   }
 };
-logvisor::Module
+inline logvisor::Module
     PosixPipelineCacheFileManager::Log("boo2::PosixPipelineCacheFileManager");
 
 template <class App, class Win, template <class, class> class Delegate>
@@ -326,7 +326,7 @@ public:
 #endif
 
     Log.report(logvisor::Error,
-               fmt("Unable to open connection to Wayland or X display"));
+               FMT_STRING("Unable to open connection to Wayland or X display"));
     return 1;
   }
 };

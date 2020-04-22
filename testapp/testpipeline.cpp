@@ -20,6 +20,7 @@ Binding BuildPipeline() {
   auto tex = hsh::create_texture2d(
       {1024, 1024}, hsh::Format::RGBA8_UNORM, 10,
       [](void *buf, std::size_t size) { std::memset(buf, 0, size); });
-  auto bind = hsh_DrawSomething(DrawSomething(uni.get(), vtx.get(), tex.get()));
-  return {std::move(uni), std::move(vtx), std::move(tex), std::move(bind)};
+  Binding ret{std::move(uni), std::move(vtx), std::move(tex), {}};
+  ret.Binding.hsh_DrawSomething(DrawSomething(uni.get(), vtx.get(), tex.get()));
+  return ret;
 }

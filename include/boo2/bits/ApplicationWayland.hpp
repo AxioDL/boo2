@@ -305,8 +305,8 @@ struct WaylandRegistry {
   }
 };
 
-const wl_registry_listener WaylandRegistry::Listener = {_RegistryHandler,
-                                                        _RegistryRemover};
+inline const wl_registry_listener WaylandRegistry::Listener = {
+    _RegistryHandler, _RegistryRemover};
 
 template <class App> class WaylandApplicationObjs {
   friend App;
@@ -662,7 +662,7 @@ public:
                                     int h) noexcept {
     if (m_builtWindow)
       Log.report(logvisor::Fatal,
-                 fmt("boo2 currently only supports one window"));
+                 FMT_STRING("boo2 currently only supports one window"));
 
     Window window(this, title, x, y, w, h);
     if (!window)
@@ -671,7 +671,7 @@ public:
     auto physSurface = this->m_instance.create_phys_surface(m_display, window);
     if (!physSurface) {
       Log.report(logvisor::Error,
-                 fmt("Unable to create Wayland Vulkan surface"));
+                 FMT_STRING("Unable to create Wayland Vulkan surface"));
       return {};
     }
 
@@ -679,7 +679,8 @@ public:
       this->m_device =
           VulkanDevice(this->m_instance, *this, this->m_delegate, *physSurface);
       if (!this->m_device) {
-        Log.report(logvisor::Error, fmt("No valid Vulkan devices accepted"));
+        Log.report(logvisor::Error,
+                   FMT_STRING("No valid Vulkan devices accepted"));
         return {};
       }
       m_buildingPipelines = true;
@@ -692,8 +693,9 @@ public:
                                                                 extent);
                               },
                               {uint32_t(w), uint32_t(h)})) {
-      Log.report(logvisor::Error,
-                 fmt("Vulkan surface not compatible with existing device"));
+      Log.report(
+          logvisor::Error,
+          FMT_STRING("Vulkan surface not compatible with existing device"));
       return {};
     }
 
@@ -763,19 +765,20 @@ private:
   int run() noexcept {
     if (!m_registry.m_wl_compositor) {
       Log.report(logvisor::Error,
-                 fmt("Unable to obtain compositor from Wayland server"));
+                 FMT_STRING("Unable to obtain compositor from Wayland server"));
       return 1;
     }
 
     if (!m_registry.m_wl_seat) {
       Log.report(logvisor::Error,
-                 fmt("Unable to obtain seat from Wayland server"));
+                 FMT_STRING("Unable to obtain seat from Wayland server"));
       return 1;
     }
 
     if (!m_registry.m_xdg_wm_base) {
-      Log.report(logvisor::Error,
-                 fmt("Unable to obtain XDG WM base from Wayland server"));
+      Log.report(
+          logvisor::Error,
+          FMT_STRING("Unable to obtain XDG WM base from Wayland server"));
       return 1;
     }
 

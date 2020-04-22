@@ -21,14 +21,14 @@ template <class Application> class WindowXcb {
     xcb_screen_iterator_t screen = xcb_setup_roots_iterator(setup);
     if (!screen.rem) {
       Application::Log.report(logvisor::Error,
-                              fmt("No screens to create window"));
+                              FMT_STRING("No screens to create window"));
       return;
     }
 
     m_window = xcb_generate_id(*parent);
     if (!m_window) {
       Application::Log.report(logvisor::Error,
-                              fmt("Unable to generate id for window"));
+                              FMT_STRING("Unable to generate id for window"));
       return;
     }
 
@@ -199,7 +199,7 @@ public:
                                     int h) noexcept {
     if (m_builtWindow)
       Log.report(logvisor::Fatal,
-                 fmt("boo2 currently only supports one window"));
+                 FMT_STRING("boo2 currently only supports one window"));
 
     Window window(this, title, x, y, w, h);
     if (!window)
@@ -207,7 +207,8 @@ public:
 
     auto physSurface = this->m_instance.create_phys_surface(m_conn, window);
     if (!physSurface) {
-      Log.report(logvisor::Error, fmt("Unable to create XCB Vulkan surface"));
+      Log.report(logvisor::Error,
+                 FMT_STRING("Unable to create XCB Vulkan surface"));
       return {};
     }
 
@@ -215,7 +216,8 @@ public:
       this->m_device =
           VulkanDevice(this->m_instance, *this, this->m_delegate, *physSurface);
       if (!this->m_device) {
-        Log.report(logvisor::Error, fmt("No valid Vulkan devices accepted"));
+        Log.report(logvisor::Error,
+                   FMT_STRING("No valid Vulkan devices accepted"));
         return {};
       }
       m_buildingPipelines = true;
@@ -227,8 +229,9 @@ public:
                                 this->m_delegate.onWindowResize(*this, windowId,
                                                                 extent);
                               })) {
-      Log.report(logvisor::Error,
-                 fmt("Vulkan surface not compatible with existing device"));
+      Log.report(
+          logvisor::Error,
+          FMT_STRING("Vulkan surface not compatible with existing device"));
       return {};
     }
 

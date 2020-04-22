@@ -56,7 +56,7 @@ public:
       : hsh::vulkan_instance_owner(hsh::create_vulkan_instance(
             appName.data(), 0, "boo2", 0, &handleError)) {}
 };
-logvisor::Module VulkanInstance::Log("boo2::VulkanInstance");
+inline logvisor::Module VulkanInstance::Log("boo2::VulkanInstance");
 
 class VulkanDevice : public hsh::vulkan_device_owner {
 public:
