@@ -1,17 +1,42 @@
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR) # because of c++17
 project(boo2 LANGUAGES C CXX VERSION 0.1)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if (NOT MSVC)
+  set(CMAKE_CXX_STANDARD 20)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+endif()
 
 if(NOT TARGET logvisor)
   add_subdirectory(logvisor)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
-find_package(hsh REQUIRED)
+if(NOT TARGET hsh)
+  find_package(hsh REQUIRED)
+endif()
 
-set(boo2_SRCS lib/HshImplementation.cpp)
+set(boo2_SRCS
+  lib/ApplicationCommon.cpp
+  lib/HshImplementation.cpp
+  lib/audiodev/AudioSubmix.cpp
+  lib/audiodev/AudioVoice.cpp
+  lib/audiodev/AudioVoiceEngine.cpp
+  lib/audiodev/LtRtProcessing.cpp
+  lib/audiodev/MIDICommon.cpp
+  lib/audiodev/MIDIDecoder.cpp
+  lib/audiodev/MIDIEncoder.cpp
+  lib/audiodev/WAVOut.cpp
+  lib/inputdev/DeviceBase.cpp
+  lib/inputdev/CafeProPad.cpp
+  lib/inputdev/RevolutionPad.cpp
+  lib/inputdev/DolphinSmashAdapter.cpp
+  lib/inputdev/NintendoPowerA.cpp
+  lib/inputdev/DualshockPad.cpp
+  lib/inputdev/GenericPad.cpp
+  lib/inputdev/DeviceSignature.cpp
+  lib/inputdev/DeviceFinder.cpp
+  lib/inputdev/HIDParser.cpp
+)
 set(boo2_LIBS "")
 set(boo2_DEFS "")
 set(boo2_INCS include)
@@ -49,7 +74,17 @@ else()
   if(NOT xcb_FOUND AND NOT wayland_FOUND)
     message(FATAL_ERROR "Unable to locate development installations of XCB or Wayland")
   endif()
-  list(APPEND boo2_LIBS ${CMAKE_DL_LIBS})
+  pkg_check_modules(pulse IMPORTED_TARGET libpulse)
+  if(NOT pulse_FOUND)
+    message(FATAL_ERROR "Unable to locate development installation of libpulse")
+  endif()
+  list(APPEND boo2_SRCS lib/audiodev/PulseAudio.cpp)
+  pkg_check_modules(udev IMPORTED_TARGET libudev)
+  if(NOT udev_FOUND)
+    message(FATAL_ERROR "Unable to locate development installation of libudev")
+  endif()
+  list(APPEND boo2_SRCS lib/inputdev/HIDListenerUdev.cpp lib/inputdev/HIDDeviceUdev.cpp)
+  list(APPEND boo2_LIBS PkgConfig::pulse PkgConfig::udev ${CMAKE_DL_LIBS})
 endif()
 
 add_library(boo2 ${boo2_SRCS})

@@ -32,7 +32,7 @@ template <class App> class WaylandWindowObjs {
   friend WindowWayland<App>;
   friend WaylandApplicationObjs<App>;
   App* m_app;
-  hsh::resource_owner<hsh::surface> hshSurface;
+  hsh::owner<hsh::surface> hshSurface;
   wl_surface* wlSurface = nullptr;
   xdg_surface* xdgSurface = nullptr;
   xdg_toplevel* xdgToplevel = nullptr;
@@ -228,7 +228,7 @@ public:
       if (m_wl->hshSurface) {
         m_wl->hshSurface.attach_deleter_lambda(
             [objs = m_wl]() { delete objs; });
-        m_wl->hshSurface = hsh::resource_owner<hsh::surface>{};
+        m_wl->hshSurface.reset();
       } else {
         delete m_wl;
       }
@@ -759,7 +759,7 @@ private:
     return wl_display_dispatch_pending(m_display);
   }
 
-  int run(int argc, SystemChar** argv) noexcept {
+  int run() noexcept {
     if (!m_registry.m_wl_compositor) {
       Log.report(logvisor::Error,
                  fmt("Unable to obtain compositor from Wayland server"));
@@ -802,11 +802,12 @@ private:
   }
 
   template <typename... DelegateArgs>
-  explicit ApplicationWayland(wl_display* display, SystemStringView appName,
+  explicit ApplicationWayland(wl_display* display, int argc, SystemChar** argv,
+                              SystemStringView appName,
                               DelegateArgs&&... args) noexcept
       : ApplicationPosix<ApplicationWayland<Delegate>,
                          WindowWayland<ApplicationWayland<Delegate>>, Delegate>(
-            appName, std::forward<DelegateArgs>(args)...),
+            argc, argv, appName, std::forward<DelegateArgs>(args)...),
         m_display(display), m_registry(display) {}
 
 public:
@@ -818,9 +819,9 @@ public:
   template <typename... DelegateArgs>
   static int exec(wl_display* display, int argc, SystemChar** argv,
                   SystemStringView appName, DelegateArgs&&... args) noexcept {
-    ApplicationWayland app(display, appName,
+    ApplicationWayland app(display, argc, argv, appName,
                            std::forward<DelegateArgs>(args)...);
-    return app.run(argc, argv);
+    return app.run();
   }
 
   static void wl_log_handler(const char* format, va_list arg) {

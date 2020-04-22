@@ -9,12 +9,20 @@
 
 namespace boo2 {
 
+extern std::vector<SystemString> Args;
+extern SystemString AppName;
+
 class ApplicationBase {
 protected:
-  SystemStringView m_appName;
-
-  explicit ApplicationBase(SystemStringView appName) noexcept
-      : m_appName(appName) {}
+  explicit ApplicationBase(int argc, SystemChar** argv,
+                           SystemStringView appName) noexcept {
+    if (argc > 1) {
+      Args.reserve(argc - 1);
+      for (int i = 1; i < argc; ++i)
+        Args.emplace_back(argv[i]);
+    }
+    AppName = appName;
+  }
 };
 
 #if HSH_ENABLE_VULKAN
@@ -39,7 +47,7 @@ class VulkanInstance : public hsh::vulkan_instance_owner {
       vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
       vk::DebugUtilsMessageTypeFlagBitsEXT messageTypes,
       const vk::DebugUtilsMessengerCallbackDataEXT& pCallbackData) noexcept {
-    Log.report(vkSeverityToLevel(messageSeverity), fmt("Vulkan: {}"),
+    Log.report(vkSeverityToLevel(messageSeverity), FMT_STRING("Vulkan: {}"),
                pCallbackData.pMessage);
   }
 

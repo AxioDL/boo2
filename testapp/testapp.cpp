@@ -8,7 +8,7 @@ using namespace std::literals;
 template <class App, class Win>
 class Delegate : public boo2::DelegateBase<App, Win> {
   Win m_window;
-  hsh::resource_owner<hsh::render_texture2d> m_renderTexture;
+  hsh::owner<hsh::render_texture2d> m_renderTexture;
   Binding PipelineBind{};
 
 public:
