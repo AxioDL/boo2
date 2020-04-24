@@ -282,6 +282,10 @@ protected:
     return this->pumpBuildVulkanPipelines(m_pcfm, static_cast<App&>(*this),
                                           m_delegate);
   }
+
+  ~ApplicationPosix() noexcept {
+    WindowDecorations::shutdown();
+  }
 };
 
 } // namespace boo2
@@ -305,7 +309,6 @@ public:
   static int exec(int argc, SystemChar** argv, SystemStringView appName,
                   DelegateArgs&&... args) noexcept {
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
-#if 0
     wl_log_set_handler_client(ApplicationWayland<Delegate>::wl_log_handler);
     if (wl_display* display = wl_display_connect(nullptr)) {
       int ret = ApplicationWayland<Delegate>::exec(
@@ -313,7 +316,6 @@ public:
       wl_display_disconnect(display);
       return ret;
     }
-#endif
 #endif
 
 #ifdef VK_USE_PLATFORM_XCB_KHR

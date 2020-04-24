@@ -27,16 +27,20 @@ template <class App> class WindowWayland;
 template <class App> class WaylandApplicationObjs;
 
 template <class App> class WaylandWindowObjs {
-  static constexpr int32_t MinDim = 128;
+  static constexpr int32_t MinDim = 256;
   static constexpr int32_t MaxDim = 16384;
+  friend App;
   friend WindowWayland<App>;
   friend WaylandApplicationObjs<App>;
+  static WaylandWindowObjs* head;
+  WaylandWindowObjs* m_next;
   App* m_app;
   hsh::owner<hsh::surface> hshSurface;
   wl_surface* wlSurface = nullptr;
   xdg_surface* xdgSurface = nullptr;
   xdg_toplevel* xdgToplevel = nullptr;
   zxdg_toplevel_decoration_v1* xdgDecoration = nullptr;
+  WindowDecorations m_decorations;
   int32_t m_width = MinDim, m_height = MinDim;
   hsh::offset2dF m_currentMouse = {};
   bool m_fullscreen = false;
@@ -126,10 +130,19 @@ template <class App> class WaylandWindowObjs {
                                    m_app->m_wl.m_keymap.getMods());
   }
 
+  void setSurface(hsh::owner<hsh::surface>&& surface) noexcept {
+    hshSurface = std::move(surface);
+    hshSurface.attach_decoration_lambda([this]() {
+      m_decorations.draw();
+    });
+  }
+
 public:
   explicit WaylandWindowObjs(App* a, int& width, int& height) noexcept
-      : m_app(a), m_width(std::max(MinDim, std::min(MaxDim, width))),
+      : m_next(head), m_app(a),
+        m_width(std::max(MinDim, std::min(MaxDim, width))),
         m_height(std::max(MinDim, std::min(MaxDim, height))) {
+    head = this;
     width = m_width;
     height = m_height;
     wlSurface = wl_compositor_create_surface(a->m_registry.m_wl_compositor);
@@ -151,6 +164,7 @@ public:
   }
 
   ~WaylandWindowObjs() noexcept {
+    head = m_next;
     if (xdgDecoration)
       zxdg_toplevel_decoration_v1_destroy(xdgDecoration);
     if (xdgToplevel)
@@ -163,9 +177,17 @@ public:
 
   void toggleFullscreen() noexcept {
     if (!m_fullscreen) {
+      hshSurface.attach_decoration_lambda([this]() {
+        m_decorations.draw();
+      });
+      hshSurface.set_margins(0, 0, 0, 0);
       xdg_toplevel_set_fullscreen(xdgToplevel, nullptr);
       m_fullscreen = true;
     } else {
+      hshSurface.attach_decoration_lambda({});
+      hshSurface.set_margins(
+          WindowDecorations::MarginL, WindowDecorations::MarginR,
+          WindowDecorations::MarginT, WindowDecorations::MarginB);
       xdg_toplevel_unset_fullscreen(xdgToplevel);
       m_fullscreen = false;
     }
@@ -180,6 +202,8 @@ public:
 
   wl_surface* getWlSurface() const noexcept { return wlSurface; }
 };
+template <class Application>
+inline WaylandWindowObjs<Application>* WaylandWindowObjs<Application>::head{};
 
 template <class Application>
 const xdg_surface_listener WaylandWindowObjs<Application>::SurfaceListener = {
@@ -207,8 +231,15 @@ template <class Application> class WindowWayland {
   bool createSurface(vk::UniqueSurfaceKHR&& physSurface,
                      std::function<void(const hsh::extent2d&)>&& resizeLambda,
                      const hsh::extent2d& extent) noexcept {
-    m_wl->hshSurface = hsh::create_surface(std::move(physSurface),
-                                           std::move(resizeLambda), {}, extent);
+    m_wl->setSurface(hsh::create_surface(
+        std::move(physSurface),
+        [wl = m_wl, handleResize = std::move(resizeLambda)](
+            const hsh::extent2d& extent, const hsh::extent2d& contentExtent) {
+          wl->m_decorations.update(extent);
+          handleResize(contentExtent);
+        },
+        {}, extent, WindowDecorations::MarginL, WindowDecorations::MarginR,
+        WindowDecorations::MarginT, WindowDecorations::MarginB));
     return m_wl->hshSurface.operator bool();
   }
 
@@ -664,6 +695,9 @@ public:
       Log.report(logvisor::Fatal,
                  FMT_STRING("boo2 currently only supports one window"));
 
+    w += WindowDecorations::MarginL + WindowDecorations::MarginR;
+    h += WindowDecorations::MarginT + WindowDecorations::MarginB;
+
     Window window(this, title, x, y, w, h);
     if (!window)
       return {};
@@ -802,6 +836,9 @@ private:
     }
 
     this->m_delegate.onAppExiting(*this);
+
+    if (this->m_device)
+      this->m_device.wait_idle();
     return 0;
   }
 

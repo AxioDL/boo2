@@ -18,6 +18,8 @@ endif()
 set(boo2_SRCS
   lib/ApplicationCommon.cpp
   lib/HshImplementation.cpp
+  lib/WindowDecorations.cpp
+  lib/WindowDecorationsRes.cpp
   lib/audiodev/AudioSubmix.cpp
   lib/audiodev/AudioVoice.cpp
   lib/audiodev/AudioVoiceEngine.cpp
@@ -37,6 +39,7 @@ set(boo2_SRCS
   lib/inputdev/DeviceFinder.cpp
   lib/inputdev/HIDParser.cpp
 )
+hsh_sources(lib/WindowDecorations.cpp)
 set(boo2_LIBS "")
 set(boo2_DEFS "")
 set(boo2_INCS include)
@@ -45,14 +48,14 @@ if(WIN32)
 elseif(APPLE)
 else()
   include(FindPkgConfig)
-  pkg_check_modules(xcb IMPORTED_TARGET xcb xcb-xkb xkbcommon-x11 xkbcommon)
+  pkg_check_modules(xcb IMPORTED_TARGET xcb xcb-icccm xcb-xkb xkbcommon-x11 xkbcommon)
   if(xcb_FOUND)
     list(APPEND boo2_LIBS PkgConfig::xcb)
     list(APPEND boo2_DEFS VK_USE_PLATFORM_XCB_KHR)
     message(STATUS "Enabling XCB")
   endif()
   pkg_check_modules(wayland IMPORTED_TARGET wayland-client wayland-egl wayland-scanner wayland-protocols xkbcommon)
-  if(wayland_FOUND)
+  if(OFF AND wayland_FOUND)
     list(APPEND boo2_LIBS PkgConfig::wayland)
     list(APPEND boo2_DEFS VK_USE_PLATFORM_WAYLAND_KHR)
     pkg_get_variable(WAYLAND_SCANNER_COMMAND wayland-scanner wayland_scanner)
@@ -88,6 +91,7 @@ else()
 endif()
 
 add_library(boo2 ${boo2_SRCS})
+target_hsh(boo2)
 target_include_directories(boo2 PUBLIC ${boo2_INCS})
 target_link_libraries(boo2 PUBLIC hsh logvisor ${boo2_LIBS})
 target_compile_definitions(boo2 PUBLIC ${boo2_DEFS})

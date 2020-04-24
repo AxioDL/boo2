@@ -5,44 +5,102 @@
 #endif
 
 #include <xcb/xcb_atom.h>
+#include <xcb/xcb_icccm.h>
 
 namespace boo2 {
 
 template <class Application> class WindowXcb {
   friend Application;
+  static constexpr int32_t MinDim = 256;
+  static constexpr int32_t MaxDim = 16384;
   hsh::owner<hsh::surface> m_hshSurface;
   Application* m_parent = nullptr;
   xcb_window_t m_window = 0;
+  xcb_colormap_t m_colormap = XCB_COPY_FROM_PARENT;
+  std::unique_ptr<WindowDecorations> m_decorations;
+
+  static xcb_visualtype_t* findArgbVisual(xcb_screen_t* screen) noexcept {
+    xcb_depth_iterator_t depth_iter;
+    depth_iter = xcb_screen_allowed_depths_iterator(screen);
+    for (; depth_iter.rem; xcb_depth_next(&depth_iter)) {
+      if (depth_iter.data->depth != 32)
+        continue;
+      xcb_visualtype_iterator_t visual_iter;
+
+      visual_iter = xcb_depth_visuals_iterator(depth_iter.data);
+      for (; visual_iter.rem; xcb_visualtype_next(&visual_iter))
+        return visual_iter.data;
+    }
+    return nullptr;
+  }
 
   explicit WindowXcb(Application* parent, SystemStringView title, int x, int y,
                      int w, int h) noexcept
-      : m_parent(parent) {
+      : m_parent(parent), m_decorations(new WindowDecorations()) {
     const struct xcb_setup_t* setup = xcb_get_setup(*m_parent);
-    xcb_screen_iterator_t screen = xcb_setup_roots_iterator(setup);
-    if (!screen.rem) {
+    xcb_screen_iterator_t screenIt = xcb_setup_roots_iterator(setup);
+    if (!screenIt.rem) {
       Application::Log.report(logvisor::Error,
                               FMT_STRING("No screens to create window"));
       return;
     }
+    xcb_screen_t* screen = screenIt.data;
 
-    m_window = xcb_generate_id(*parent);
+    uint8_t depth = XCB_COPY_FROM_PARENT;
+    xcb_visualid_t visualId = screen->root_visual;
+    if (xcb_visualtype_t* argb = findArgbVisual(screen)) {
+      if (uint32_t argbColormap = xcb_generate_id(*m_parent)) {
+        if (xcb_generic_error_t* err = xcb_request_check(
+                *m_parent, xcb_create_colormap_checked(
+                               *m_parent, XCB_COLORMAP_ALLOC_NONE, argbColormap,
+                               screen->root, argb->visual_id))) {
+          free(err);
+        } else {
+          depth = 32;
+          m_colormap = argbColormap;
+          visualId = argb->visual_id;
+        }
+      }
+    }
+
+    m_window = xcb_generate_id(*m_parent);
     if (!m_window) {
       Application::Log.report(logvisor::Error,
                               FMT_STRING("Unable to generate id for window"));
       return;
     }
 
-    uint32_t EventMask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
+    uint32_t EventMask = XCB_CW_BACK_PIXEL | XCB_CW_BORDER_PIXEL |
+                         XCB_CW_EVENT_MASK | XCB_CW_COLORMAP;
     uint32_t ValueList[] = {
-        screen.data->black_pixel,
+        /* XCB_CW_BACK_PIXEL */
+        screen->black_pixel,
+        /* XCB_CW_BORDER_PIXEL */
+        screen->black_pixel,
+        /* XCB_CW_EVENT_MASK */
         XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
             XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE |
             XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_ENTER_WINDOW |
-            XCB_EVENT_MASK_LEAVE_WINDOW};
-    xcb_create_window(*m_parent, XCB_COPY_FROM_PARENT, m_window,
-                      screen.data->root, x, y, w, h, 0,
-                      XCB_WINDOW_CLASS_INPUT_OUTPUT, screen.data->root_visual,
-                      EventMask, ValueList);
+            XCB_EVENT_MASK_LEAVE_WINDOW,
+        /* XCB_CW_COLORMAP */
+        m_colormap};
+    if (xcb_generic_error_t* err = xcb_request_check(
+            *m_parent, xcb_create_window_checked(
+                           *m_parent, depth, m_window, screen->root, x, y, w, h,
+                           0, XCB_WINDOW_CLASS_INPUT_OUTPUT, visualId,
+                           EventMask, ValueList))) {
+      Application::Log.report(logvisor::Error,
+                              FMT_STRING("X error creating window: {}"),
+                              err->error_code);
+      free(err);
+      if (m_colormap != XCB_COPY_FROM_PARENT) {
+        xcb_free_colormap(*m_parent, m_colormap);
+        m_colormap = XCB_COPY_FROM_PARENT;
+      }
+      m_window = 0;
+      return;
+    }
+
     xcb_change_property(*m_parent, XCB_PROP_MODE_REPLACE, m_window,
                         XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, title.size(),
                         title.data());
@@ -50,21 +108,35 @@ template <class Application> class WindowXcb {
                         m_parent->m_atoms.m_WM_PROTOCOLS, 4, 32, 1,
                         &m_parent->m_atoms.m_WM_DELETE_WINDOW);
 
+    xcb_size_hints_t hints;
+    xcb_icccm_size_hints_set_min_size(&hints, MinDim, MinDim);
+    xcb_icccm_size_hints_set_max_size(&hints, MaxDim, MaxDim);
+    xcb_icccm_set_wm_size_hints(*m_parent, m_window, XCB_ATOM_WM_NORMAL_HINTS,
+                                &hints);
+
     m_parent->flushLater();
   }
 
   bool createSurface(
       vk::UniqueSurfaceKHR&& physSurface,
       std::function<void(const hsh::extent2d&)>&& resizeLambda) noexcept {
-    m_hshSurface =
-        hsh::create_surface(std::move(physSurface), std::move(resizeLambda));
+    m_hshSurface = hsh::create_surface(
+        std::move(physSurface),
+        [dec = m_decorations.get(), handleResize = std::move(resizeLambda)](
+            const hsh::extent2d& extent, const hsh::extent2d& contentExtent) {
+          dec->update(extent);
+          handleResize(contentExtent);
+        },
+        {}, {}, WindowDecorations::MarginL, WindowDecorations::MarginR,
+        WindowDecorations::MarginT, WindowDecorations::MarginB);
+    m_hshSurface.attach_decoration_lambda(
+        [dec = m_decorations.get()]() { dec->draw(); });
     return m_hshSurface.operator bool();
   }
 
-  operator xcb_window_t() const noexcept { return m_window; }
-
 public:
   using ID = xcb_window_t;
+  operator xcb_window_t() const noexcept { return m_window; }
   ID getID() const noexcept { return m_window; }
   bool operator==(ID id) const noexcept { return m_window == id; }
   bool operator!=(ID id) const noexcept { return m_window != id; }
@@ -76,17 +148,24 @@ public:
       if (m_hshSurface) {
         xcb_connection_t* conn = *m_parent;
         xcb_window_t win = m_window;
-        m_hshSurface.attach_deleter_lambda(
-            [conn, win]() { xcb_destroy_window(conn, win); });
+        xcb_colormap_t cmap = m_colormap;
+        m_hshSurface.attach_deleter_lambda([conn, win, cmap]() {
+          xcb_destroy_window(conn, win);
+          if (cmap != XCB_COPY_FROM_PARENT)
+            xcb_free_colormap(conn, cmap);
+        });
       } else {
         xcb_destroy_window(*m_parent, m_window);
+        if (m_colormap != XCB_COPY_FROM_PARENT)
+          xcb_free_colormap(*m_parent, m_colormap);
       }
     }
   }
 
   WindowXcb(WindowXcb&& other) noexcept
       : m_hshSurface(std::move(other.m_hshSurface)), m_parent(other.m_parent),
-        m_window(other.m_window) {
+        m_window(other.m_window), m_colormap(other.m_colormap),
+        m_decorations(std::move(other.m_decorations)) {
     other.m_parent = nullptr;
     other.m_window = 0;
   }
@@ -95,6 +174,8 @@ public:
     std::swap(m_hshSurface, other.m_hshSurface);
     std::swap(m_parent, other.m_parent);
     std::swap(m_window, other.m_window);
+    std::swap(m_colormap, other.m_colormap);
+    std::swap(m_decorations, other.m_decorations);
     return *this;
   }
 
@@ -201,6 +282,9 @@ public:
       Log.report(logvisor::Fatal,
                  FMT_STRING("boo2 currently only supports one window"));
 
+    w += WindowDecorations::MarginL + WindowDecorations::MarginR;
+    h += WindowDecorations::MarginT + WindowDecorations::MarginB;
+
     Window window(this, title, x, y, w, h);
     if (!window)
       return {};
@@ -242,9 +326,13 @@ public:
     return window;
   }
 
-  void quit() noexcept { m_running = false; }
+  void quit(int code = 0) noexcept {
+    m_running = false;
+    m_exitCode = code;
+  }
 
 private:
+  int m_exitCode = 0;
   bool m_running = true;
   bool m_pendingFlush = false;
   bool m_buildingPipelines = false;
@@ -391,7 +479,10 @@ private:
     }
 
     this->m_delegate.onAppExiting(*this);
-    return 0;
+
+    if (this->m_device)
+      this->m_device.wait_idle();
+    return m_exitCode;
   }
 
   template <typename... DelegateArgs>

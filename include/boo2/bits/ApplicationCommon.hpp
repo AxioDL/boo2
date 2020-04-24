@@ -1,6 +1,7 @@
 #pragma once
 
 #include "boo2/System.hpp"
+#include "WindowDecorations.hpp"
 
 #include <hsh/hsh.h>
 #include <logvisor/logvisor.hpp>

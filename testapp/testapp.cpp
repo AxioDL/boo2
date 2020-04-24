@@ -15,19 +15,24 @@ public:
   void onAppLaunched(App& a) noexcept {
     std::cout << "launch" << std::endl;
     m_window = a.createWindow(_SYS_STR("Hello World!"sv), 0, 0, 512, 512);
+    if (!m_window) {
+      a.quit(1);
+      return;
+    }
     m_renderTexture = hsh::create_render_texture2d(m_window);
   }
 
   void onAppIdle(App& a) noexcept {
-    if (!PipelineBind.Binding)
+    if (!PipelineBind.Binding) {
       PipelineBind = BuildPipeline();
 
-    UniformData UniData{};
-    UniData.xf[0][0] = 1.f;
-    UniData.xf[1][1] = 1.f;
-    UniData.xf[2][2] = 1.f;
-    UniData.xf[3][3] = 1.f;
-    PipelineBind.Uniform.load(UniData);
+      UniformData UniData{};
+      UniData.xf[0][0] = 1.f;
+      UniData.xf[1][1] = 1.f;
+      UniData.xf[2][2] = 1.f;
+      UniData.xf[3][3] = 1.f;
+      PipelineBind.Uniform.load(UniData);
+    }
 
     if (m_window.acquireNextImage()) {
       m_renderTexture.attach();
