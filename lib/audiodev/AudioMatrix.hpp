@@ -12,22 +12,6 @@
 namespace boo2 {
 struct AudioVoiceEngineMixInfo;
 
-static inline int16_t Clamp16(float in) {
-  if (in < SHRT_MIN)
-    return SHRT_MIN;
-  else if (in > SHRT_MAX)
-    return SHRT_MAX;
-  return in;
-}
-
-static inline int32_t Clamp32(float in) {
-  if (in < INT_MIN)
-    return INT_MIN;
-  else if (in > INT_MAX)
-    return INT_MAX;
-  return in;
-}
-
 class AudioMatrixMono {
   union Coefs {
     float v[8];
@@ -64,10 +48,6 @@ public:
     m_curSlewFrame = 0;
   }
 
-  int16_t* mixMonoSampleData(const AudioVoiceEngineMixInfo& info, const int16_t* dataIn, int16_t* dataOut,
-                             size_t samples);
-  int32_t* mixMonoSampleData(const AudioVoiceEngineMixInfo& info, const int32_t* dataIn, int32_t* dataOut,
-                             size_t samples);
   float* mixMonoSampleData(const AudioVoiceEngineMixInfo& info, const float* dataIn, float* dataOut, size_t samples);
 
   bool isSilent() const {
@@ -125,10 +105,6 @@ public:
     m_curSlewFrame = 0;
   }
 
-  int16_t* mixStereoSampleData(const AudioVoiceEngineMixInfo& info, const int16_t* dataIn, int16_t* dataOut,
-                               size_t frames);
-  int32_t* mixStereoSampleData(const AudioVoiceEngineMixInfo& info, const int32_t* dataIn, int32_t* dataOut,
-                               size_t frames);
   float* mixStereoSampleData(const AudioVoiceEngineMixInfo& info, const float* dataIn, float* dataOut, size_t frames);
 
   bool isSilent() const {

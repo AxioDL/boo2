@@ -7,25 +7,6 @@
 #undef max
 
 namespace boo2 {
-namespace {
-template <typename T>
-constexpr T ClampFull(float in) {
-  if constexpr (std::is_floating_point_v<T>) {
-    return std::clamp(in, -1.f, 1.f);
-  } else {
-    constexpr T MAX = std::numeric_limits<T>::max();
-    constexpr T MIN = std::numeric_limits<T>::min();
-
-    if (in < MIN)
-      return MIN;
-    else if (in > MAX)
-      return MAX;
-    else
-      return in;
-  }
-}
-} // Anonymous namespace
-
 #if INTEL_IPP
 
 #ifndef M_PI
@@ -195,32 +176,6 @@ template void WindowedHilbert::Output<float>(float* output, float lCoef, float r
 
 #endif
 
-template <>
-int16_t* LtRtProcessing::_getInBuf<int16_t>() {
-  return m_16Buffer.get();
-}
-template <>
-int32_t* LtRtProcessing::_getInBuf<int32_t>() {
-  return m_32Buffer.get();
-}
-template <>
-float* LtRtProcessing::_getInBuf<float>() {
-  return m_fltBuffer.get();
-}
-
-template <>
-int16_t* LtRtProcessing::_getOutBuf<int16_t>() {
-  return m_16Buffer.get() + m_outputOffset;
-}
-template <>
-int32_t* LtRtProcessing::_getOutBuf<int32_t>() {
-  return m_32Buffer.get() + m_outputOffset;
-}
-template <>
-float* LtRtProcessing::_getOutBuf<float>() {
-  return m_fltBuffer.get() + m_outputOffset;
-}
-
 LtRtProcessing::LtRtProcessing(int _5msFrames, const AudioVoiceEngineMixInfo& mixInfo)
 : m_inMixInfo(mixInfo)
 , m_windowFrames(_5msFrames * 4)
@@ -240,23 +195,10 @@ LtRtProcessing::LtRtProcessing(int _5msFrames, const AudioVoiceEngineMixInfo& mi
   m_inMixInfo.m_channelMap.m_channels[4] = AudioChannel::RearRight;
 
   const int samples = m_windowFrames * (5 * 2 + 2 * 2);
-  switch (mixInfo.m_sampleFormat) {
-  case SOXR_INT16_I:
-    m_16Buffer = std::make_unique<int16_t[]>(samples);
-    break;
-  case SOXR_INT32_I:
-    m_32Buffer = std::make_unique<int32_t[]>(samples);
-    break;
-  case SOXR_FLOAT32_I:
-    m_fltBuffer = std::make_unique<float[]>(samples);
-    break;
-  default:
-    break;
-  }
+  m_fltBuffer = std::make_unique<float[]>(samples);
 }
 
-template <typename T>
-void LtRtProcessing::Process(const T* input, T* output, int frameCount) {
+void LtRtProcessing::Process(const float* input, float* output, int frameCount) {
 #if 0
   for (int i = 0; i < frameCount; ++i)
   {
@@ -267,26 +209,26 @@ void LtRtProcessing::Process(const T* input, T* output, int frameCount) {
 #endif
 
   int outFramesRem = frameCount;
-  T* inBuf = _getInBuf<T>();
-  T* outBuf = _getOutBuf<T>();
+  float* inBuf = _getInBuf();
+  float* outBuf = _getOutBuf();
   int tail = std::min(m_windowFrames * 2, m_bufferTail + frameCount);
   int samples = (tail - m_bufferTail) * 5;
-  memmove(&inBuf[m_bufferTail * 5], input, samples * sizeof(T));
+  memmove(&inBuf[m_bufferTail * 5], input, samples * sizeof(float));
   // fmt::print("input {} to {}\n", tail - m_bufferTail, m_bufferTail);
   input += samples;
   frameCount -= tail - m_bufferTail;
 
   int head = std::min(m_windowFrames * 2, m_bufferHead + outFramesRem);
   samples = (head - m_bufferHead) * 2;
-  memmove(output, outBuf + m_bufferHead * 2, samples * sizeof(T));
+  memmove(output, outBuf + m_bufferHead * 2, samples * sizeof(float));
   // fmt::print("output {} from {}\n", head - m_bufferHead, m_bufferHead);
   output += samples;
   outFramesRem -= head - m_bufferHead;
 
   int bufIdx = m_bufferTail / m_windowFrames;
   if (tail / m_windowFrames > bufIdx) {
-    T* in = &inBuf[bufIdx * m_windowFrames * 5];
-    T* out = &outBuf[bufIdx * m_windowFrames * 2];
+    float* in = &inBuf[bufIdx * m_windowFrames * 5];
+    float* out = &outBuf[bufIdx * m_windowFrames * 2];
 #if INTEL_IPP
     m_hilbertSL.AddWindow(in + 3, 5);
     m_hilbertSR.AddWindow(in + 4, 5);
@@ -297,22 +239,22 @@ void LtRtProcessing::Process(const T* input, T* output, int frameCount) {
     if (bufIdx) {
       int delayI = -m_halfFrames;
       for (int i = 0; i < m_windowFrames; ++i, ++delayI) {
-        out[i * 2] = ClampFull<T>(in[delayI * 5] + 0.7071068f * in[delayI * 5 + 2]);
-        out[i * 2 + 1] = ClampFull<T>(in[delayI * 5 + 1] + 0.7071068f * in[delayI * 5 + 2]);
+        out[i * 2] = in[delayI * 5] + 0.7071068f * in[delayI * 5 + 2];
+        out[i * 2 + 1] = in[delayI * 5 + 1] + 0.7071068f * in[delayI * 5 + 2];
         // fmt::print("in {} out {}\n", bufIdx * m_5msFrames + delayI, bufIdx * m_5msFrames + i);
       }
     } else {
       int delayI = m_windowFrames * 2 - m_halfFrames;
       int i;
       for (i = 0; i < m_halfFrames; ++i, ++delayI) {
-        out[i * 2] = ClampFull<T>(in[delayI * 5] + 0.7071068f * in[delayI * 5 + 2]);
-        out[i * 2 + 1] = ClampFull<T>(in[delayI * 5 + 1] + 0.7071068f * in[delayI * 5 + 2]);
+        out[i * 2] = in[delayI * 5] + 0.7071068f * in[delayI * 5 + 2];
+        out[i * 2 + 1] = in[delayI * 5 + 1] + 0.7071068f * in[delayI * 5 + 2];
         // fmt::print("in {} out {}\n", bufIdx * m_5msFrames + delayI, bufIdx * m_5msFrames + i);
       }
       delayI = 0;
       for (; i < m_windowFrames; ++i, ++delayI) {
-        out[i * 2] = ClampFull<T>(in[delayI * 5] + 0.7071068f * in[delayI * 5 + 2]);
-        out[i * 2 + 1] = ClampFull<T>(in[delayI * 5 + 1] + 0.7071068f * in[delayI * 5 + 2]);
+        out[i * 2] = in[delayI * 5] + 0.7071068f * in[delayI * 5 + 2];
+        out[i * 2 + 1] = in[delayI * 5 + 1] + 0.7071068f * in[delayI * 5 + 2];
         // fmt::print("in {} out {}\n", bufIdx * m_5msFrames + delayI, bufIdx * m_5msFrames + i);
       }
     }
@@ -326,21 +268,17 @@ void LtRtProcessing::Process(const T* input, T* output, int frameCount) {
 
   if (frameCount) {
     samples = frameCount * 5;
-    memmove(inBuf, input, samples * sizeof(T));
+    memmove(inBuf, input, samples * sizeof(float));
     // fmt::print("input {} to {}\n", frameCount, 0);
     m_bufferTail = frameCount;
   }
 
   if (outFramesRem) {
     samples = outFramesRem * 2;
-    memmove(output, outBuf, samples * sizeof(T));
+    memmove(output, outBuf, samples * sizeof(float));
     // fmt::print("output {} from {}\n", outFramesRem, 0);
     m_bufferHead = outFramesRem;
   }
 }
-
-template void LtRtProcessing::Process<int16_t>(const int16_t* input, int16_t* output, int frameCount);
-template void LtRtProcessing::Process<int32_t>(const int32_t* input, int32_t* output, int frameCount);
-template void LtRtProcessing::Process<float>(const float* input, float* output, int frameCount);
 
 } // namespace boo2

@@ -1,7 +1,12 @@
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR) # because of c++17
+
+if(BOO2_NX)
+  set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_LIST_DIR}/cmake/nx.cmake")
+endif()
+
 project(boo2 LANGUAGES C CXX VERSION 0.1)
 
-if (NOT MSVC)
+if(NOT MSVC)
   set(CMAKE_CXX_STANDARD 20)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 endif()
@@ -12,8 +17,10 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 if(NOT TARGET hsh)
-  find_package(hsh REQUIRED)
+  find_package(hsh REQUIRED CMAKE_FIND_ROOT_PATH_BOTH)
 endif()
+
+add_subdirectory(lib/audiodev/soxr/src)
 
 set(boo2_SRCS
   lib/ApplicationCommon.cpp
@@ -46,6 +53,8 @@ set(boo2_INCS include)
 
 if(WIN32)
 elseif(APPLE)
+elseif(NX)
+  list(APPEND boo2_LIBS debug deko3dd optimized deko3d debug nxd optimized nx)
 else()
   include(FindPkgConfig)
   pkg_check_modules(xcb IMPORTED_TARGET xcb xcb-icccm xcb-xkb xkbcommon-x11 xkbcommon)
@@ -92,8 +101,8 @@ endif()
 
 add_library(boo2 ${boo2_SRCS})
 target_hsh(boo2)
-target_include_directories(boo2 PUBLIC ${boo2_INCS})
-target_link_libraries(boo2 PUBLIC hsh logvisor ${boo2_LIBS})
+target_include_directories(boo2 PUBLIC ${boo2_INCS} PRIVATE lib/audiodev/soxr/src)
+target_link_libraries(boo2 PUBLIC hsh soxr logvisor ${boo2_LIBS})
 target_compile_definitions(boo2 PUBLIC ${boo2_DEFS})
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)

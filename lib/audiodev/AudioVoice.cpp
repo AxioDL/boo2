@@ -63,8 +63,7 @@ void AudioVoiceMono::_resetSampleRate(double sampleRate) {
   soxr_delete(m_src);
 
   double rateOut = m_head->mixInfo().m_sampleRate;
-  soxr_datatype_t formatOut = m_head->mixInfo().m_sampleFormat;
-  soxr_io_spec_t ioSpec = soxr_io_spec(SOXR_INT16_I, formatOut);
+  soxr_io_spec_t ioSpec = soxr_io_spec(SOXR_INT16_I, SOXR_FLOAT32_I);
   soxr_quality_spec_t qSpec = soxr_quality_spec(SOXR_20_BITQ, m_dynamicRate ? SOXR_VR : 0);
 
   soxr_error_t err;
@@ -183,8 +182,7 @@ void AudioVoiceStereo::_resetSampleRate(double sampleRate) {
   soxr_delete(m_src);
 
   double rateOut = m_head->mixInfo().m_sampleRate;
-  soxr_datatype_t formatOut = m_head->mixInfo().m_sampleFormat;
-  soxr_io_spec_t ioSpec = soxr_io_spec(SOXR_INT16_I, formatOut);
+  soxr_io_spec_t ioSpec = soxr_io_spec(SOXR_INT16_I, SOXR_FLOAT32_I);
   soxr_quality_spec_t qSpec = soxr_quality_spec(SOXR_20_BITQ, m_dynamicRate ? SOXR_VR : 0);
 
   soxr_error_t err;

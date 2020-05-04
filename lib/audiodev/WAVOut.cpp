@@ -169,7 +169,6 @@ struct WAVOutVoiceEngine : BaseAudioVoiceEngine {
 
     m_mixInfo.m_periodFrames = 512;
     m_mixInfo.m_sampleRate = sampleRate;
-    m_mixInfo.m_sampleFormat = SOXR_FLOAT32_I;
     m_mixInfo.m_bitsPerSample = 32;
     _buildAudioRenderClient();
   }

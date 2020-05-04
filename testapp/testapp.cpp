@@ -11,10 +11,18 @@ class Delegate : public boo2::DelegateBase<App, Win> {
   hsh::owner<hsh::render_texture2d> m_renderTexture;
   Binding PipelineBind{};
 
+#if __SWITCH__
+  static constexpr int W = 1280;
+  static constexpr int H = 720;
+#else
+  static constexpr int W = 512;
+  static constexpr int H = 512;
+#endif
+
 public:
   void onAppLaunched(App& a) noexcept {
     std::cout << "launch" << std::endl;
-    m_window = a.createWindow(_SYS_STR("Hello World!"sv), 0, 0, 512, 512);
+    m_window = a.createWindow(_SYS_STR("Hello World!"sv), 0, 0, W, H);
     if (!m_window) {
       a.quit(1);
       return;
@@ -55,7 +63,7 @@ public:
       const vk::PhysicalDeviceDriverProperties& driverProps) noexcept {
     if (driverProps.driverID == vk::DriverId::eMesaRadv)
       return true;
-    //if (driverProps.driverID == vk::DriverId::eAmdOpenSource)
+    // if (driverProps.driverID == vk::DriverId::eAmdOpenSource)
     //  return true;
     return false;
   }
@@ -83,6 +91,7 @@ public:
 };
 
 int main(int argc, char** argv) noexcept {
+  logvisor::RegisterStandardExceptions();
   logvisor::RegisterConsoleLogger();
   return boo2::Application<Delegate>::exec(argc, argv, "boo2_testapp"sv);
 }

@@ -75,7 +75,6 @@ struct PulseAudioVoiceEngine : LinuxMidi {
     m_5msFrames = m_sampleSpec.rate * 5 / 1000;
 
     m_mixInfo.m_sampleRate = m_sampleSpec.rate;
-    m_mixInfo.m_sampleFormat = SOXR_FLOAT32;
     m_mixInfo.m_bitsPerSample = 32;
     m_mixInfo.m_periodFrames = m_5msFrames;
     if (!(m_stream = pa_stream_new(m_ctx, "master", &m_sampleSpec, &m_chanMap))) {
@@ -313,7 +312,6 @@ struct PulseAudioVoiceEngine : LinuxMidi {
     if (!m_stream) {
       /* Dummy pump mode - use failsafe defaults for 1/60sec of samples */
       m_mixInfo.m_sampleRate = 32000.0;
-      m_mixInfo.m_sampleFormat = SOXR_FLOAT32_I;
       m_mixInfo.m_bitsPerSample = 32;
       m_5msFrames = 32000 / 60;
       m_mixInfo.m_periodFrames = m_5msFrames;

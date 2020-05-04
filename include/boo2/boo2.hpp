@@ -4,6 +4,8 @@
 
 #ifdef _WIN32
 #elif __APPLE__
+#elif __SWITCH__
+#include "bits/ApplicationNx.hpp"
 #else
 #include "bits/ApplicationPosix.hpp"
 #endif
@@ -12,6 +14,9 @@ namespace boo2 {
 
 #ifdef _WIN32
 #elif __APPLE__
+#elif __SWITCH__
+template <template <class, class> class Delegate>
+using Application = ApplicationNxExec<Delegate>;
 #else
 template <template <class, class> class Delegate>
 using Application = ApplicationPosixExec<Delegate>;

@@ -62,21 +62,16 @@ class LtRtProcessing {
   int m_outputOffset;
   int m_bufferTail = 0;
   int m_bufferHead = 0;
-  std::unique_ptr<int16_t[]> m_16Buffer;
-  std::unique_ptr<int32_t[]> m_32Buffer;
   std::unique_ptr<float[]> m_fltBuffer;
 #if INTEL_IPP
   WindowedHilbert m_hilbertSL, m_hilbertSR;
 #endif
-  template <typename T>
-  T* _getInBuf();
-  template <typename T>
-  T* _getOutBuf();
+  float* _getInBuf() { return m_fltBuffer.get(); }
+  float* _getOutBuf() { return m_fltBuffer.get() + m_outputOffset;}
 
 public:
   LtRtProcessing(int _5msFrames, const AudioVoiceEngineMixInfo& mixInfo);
-  template <typename T>
-  void Process(const T* input, T* output, int frameCount);
+  void Process(const float* input, float* output, int frameCount);
   const AudioVoiceEngineMixInfo& inMixInfo() const { return m_inMixInfo; }
 };
 
