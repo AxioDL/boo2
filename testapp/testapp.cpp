@@ -63,6 +63,8 @@ public:
       const vk::PhysicalDeviceDriverProperties& driverProps) noexcept {
     if (driverProps.driverID == vk::DriverId::eMesaRadv)
       return true;
+    if (driverProps.driverID == vk::DriverId::eNvidiaProprietary)
+      return true;
     // if (driverProps.driverID == vk::DriverId::eAmdOpenSource)
     //  return true;
     return false;
@@ -92,6 +94,10 @@ public:
 
 int main(int argc, char** argv) noexcept {
   logvisor::RegisterStandardExceptions();
+#if !defined(__SWITCH__) || LOGVISOR_NX_LM
   logvisor::RegisterConsoleLogger();
+#else
+  logvisor::RegisterFileLogger("/switch/testapp.log");
+#endif
   return boo2::Application<Delegate>::exec(argc, argv, "boo2_testapp"sv);
 }
