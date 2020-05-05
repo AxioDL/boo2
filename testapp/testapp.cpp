@@ -92,6 +92,10 @@ public:
 
 int main(int argc, char** argv) noexcept {
   logvisor::RegisterStandardExceptions();
+#if LOGVISOR_NX_LM
   logvisor::RegisterConsoleLogger();
+#else
+  logvisor::RegisterFileLogger("/switch/testapp.log");
+#endif
   return boo2::Application<Delegate>::exec(argc, argv, "boo2_testapp"sv);
 }
