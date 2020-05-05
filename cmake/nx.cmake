@@ -50,7 +50,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 #set(CMAKE_STATIC_LINKER_FLAGS_INIT "-march=armv8-a -mtune=cortex-a57 -mtp=soft -L${DEVKITPRO}/libnx/lib")
-set(CMAKE_EXE_LINKER_FLAGS "\"-specs=${CMAKE_CURRENT_LIST_DIR}/nx/switch-hsh.specs\" \"-T${CMAKE_CURRENT_LIST_DIR}/nx/switch-hsh.ld\" -march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIE -L${DEVKITPRO}/libnx/lib")
+set(CMAKE_EXE_LINKER_FLAGS "\"-specs=${CMAKE_CURRENT_LIST_DIR}/nx/switch-hsh.specs\" \"-T${CMAKE_CURRENT_LIST_DIR}/nx/switch-hsh.ld\" -L${DEVKITPRO}/libnx/lib")
 
 
 set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "Shared libs not available")
