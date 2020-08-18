@@ -326,6 +326,18 @@ public:
     return window;
   }
 
+  void dispatchLatestEvents() noexcept {
+    if (m_pendingFlush) {
+      m_pendingFlush = false;
+      xcb_flush(m_conn);
+    }
+
+    while (xcb_generic_event_t* event = xcb_poll_for_event(m_conn)) {
+      dispatchEvent(event);
+      free(event);
+    }
+  }
+
   void quit(int code = 0) noexcept {
     m_running = false;
     m_exitCode = code;
@@ -337,6 +349,119 @@ private:
   bool m_pendingFlush = false;
   bool m_buildingPipelines = false;
   void flushLater() noexcept { m_pendingFlush = true; }
+
+  void dispatchEvent(xcb_generic_event_t* event) noexcept {
+    uint8_t opcode = event->response_type & ~0x80u;
+    switch (opcode) {
+    case XCB_KEY_PRESS: {
+      auto* m = (xcb_key_press_event_t*)event;
+      m_keymap.translateKey(
+          m->detail,
+          [a = this, w = m->event](uint32_t sym, KeyModifier mods) {
+            if (sym == '\r' && (mods & KeyModifier::Alt) != KeyModifier::None)
+              a->toggleFullscreen(w);
+            a->m_delegate.onUtf32Pressed(*a, w, sym, mods);
+          },
+          [a = this, w = m->event](Keycode code, KeyModifier mods) {
+            a->m_delegate.onSpecialKeyPressed(*a, w, code, mods);
+          });
+      break;
+    }
+    case XCB_KEY_RELEASE: {
+      auto* m = (xcb_key_release_event_t*)event;
+      m_keymap.translateKey(
+          m->detail,
+          [a = this, w = m->event](uint32_t sym, KeyModifier mods) {
+            a->m_delegate.onUtf32Released(*a, w, sym, mods);
+          },
+          [a = this, w = m->event](Keycode code, KeyModifier mods) {
+            a->m_delegate.onSpecialKeyReleased(*a, w, code, mods);
+          });
+      break;
+    }
+    case XCB_BUTTON_PRESS: {
+      auto* m = (xcb_button_press_event_t*)event;
+      switch (m->detail) {
+#define BOO2_XBUTTON(name, xnum, wlnum)                                        \
+  case xnum:                                                                   \
+    this->m_delegate.onMouseDown(*this, m->event,                              \
+                                 hsh::offset2d(m->event_x, m->event_y),        \
+                                 MouseButton::name, m_keymap.getMods());       \
+    break;
+#define BOO2_XBUTTON_SCROLL(x, y, xnum)                                        \
+  case xnum:                                                                   \
+    this->m_delegate.onScroll(*this, m->event, hsh::offset2d(x, y),            \
+                              m_keymap.getMods());                             \
+    break;
+#include "XButtons.def"
+      default:
+        break;
+      }
+      break;
+    }
+    case XCB_BUTTON_RELEASE: {
+      auto* m = (xcb_button_release_event_t*)event;
+      switch (m->detail) {
+#define BOO2_XBUTTON(name, xnum, wlnum)                                        \
+  case xnum:                                                                   \
+    this->m_delegate.onMouseUp(*this, m->event,                                \
+                               hsh::offset2d(m->event_x, m->event_y),          \
+                               MouseButton::name, m_keymap.getMods());         \
+    break;
+#include "XButtons.def"
+      default:
+        break;
+      }
+      break;
+    }
+    case XCB_MOTION_NOTIFY: {
+      auto* m = (xcb_motion_notify_event_t*)event;
+      this->m_delegate.onMouseMove(*this, m->event,
+                                   hsh::offset2d(m->event_x, m->event_y),
+                                   m_keymap.getMods());
+      break;
+    }
+    case XCB_ENTER_NOTIFY: {
+      auto* m = (xcb_enter_notify_event_t*)event;
+      if (m->mode == XCB_NOTIFY_MODE_NORMAL)
+        this->m_delegate.onMouseEnter(*this, m->event,
+                                      hsh::offset2d(m->event_x, m->event_y),
+                                      m_keymap.getMods());
+      break;
+    }
+    case XCB_LEAVE_NOTIFY: {
+      auto* m = (xcb_leave_notify_event_t*)event;
+      if (m->mode == XCB_NOTIFY_MODE_NORMAL)
+        this->m_delegate.onMouseLeave(*this, m->event,
+                                      hsh::offset2d(m->event_x, m->event_y),
+                                      m_keymap.getMods());
+      break;
+    }
+    case XCB_CLIENT_MESSAGE: {
+      auto* m = (xcb_client_message_event_t*)event;
+      if (m->data.data32[0] == m_atoms.m_WM_DELETE_WINDOW)
+        this->m_delegate.onQuitRequest(*this);
+      break;
+    }
+    default:
+      if (opcode == m_xkbBaseEvent) {
+        switch (event->pad0) {
+        case XCB_XKB_NEW_KEYBOARD_NOTIFY:
+        case XCB_XKB_MAP_NOTIFY: {
+          m_keymap.setKeymap(m_conn, nullptr);
+          break;
+        }
+        case XCB_XKB_STATE_NOTIFY: {
+          m_keymap.updateModifiers((xcb_xkb_state_notify_event_t*)event);
+          break;
+        }
+        default:
+          break;
+        }
+      }
+      break;
+    }
+  }
 
   int run() noexcept {
     if (!this->m_instance)
@@ -352,130 +477,19 @@ private:
         xcb_flush(m_conn);
       }
 
-      xcb_generic_event_t* event = xcb_poll_for_event(m_conn);
-      if (!event) {
-        if (this->m_device) {
-          this->m_device.enter_draw_context([this]() {
-            if (m_buildingPipelines)
-              m_buildingPipelines = this->pumpBuildPipelines();
-            else
-              this->m_delegate.onAppIdle(*this);
-          });
-        }
-        continue;
+      while (xcb_generic_event_t* event = xcb_poll_for_event(m_conn)) {
+        dispatchEvent(event);
+        free(event);
       }
 
-      uint8_t opcode = event->response_type & ~0x80u;
-      switch (opcode) {
-      case XCB_KEY_PRESS: {
-        auto* m = (xcb_key_press_event_t*)event;
-        m_keymap.translateKey(
-            m->detail,
-            [a = this, w = m->event](uint32_t sym, KeyModifier mods) {
-              if (sym == '\r' && (mods & KeyModifier::Alt) != KeyModifier::None)
-                a->toggleFullscreen(w);
-              a->m_delegate.onUtf32Pressed(*a, w, sym, mods);
-            },
-            [a = this, w = m->event](Keycode code, KeyModifier mods) {
-              a->m_delegate.onSpecialKeyPressed(*a, w, code, mods);
-            });
-        break;
+      if (this->m_device) {
+        this->m_device.enter_draw_context([this]() {
+          if (m_buildingPipelines)
+            m_buildingPipelines = this->pumpBuildPipelines();
+          else
+            this->m_delegate.onAppIdle(*this);
+        });
       }
-      case XCB_KEY_RELEASE: {
-        auto* m = (xcb_key_release_event_t*)event;
-        m_keymap.translateKey(
-            m->detail,
-            [a = this, w = m->event](uint32_t sym, KeyModifier mods) {
-              a->m_delegate.onUtf32Released(*a, w, sym, mods);
-            },
-            [a = this, w = m->event](Keycode code, KeyModifier mods) {
-              a->m_delegate.onSpecialKeyReleased(*a, w, code, mods);
-            });
-        break;
-      }
-      case XCB_BUTTON_PRESS: {
-        auto* m = (xcb_button_press_event_t*)event;
-        switch (m->detail) {
-#define BOO2_XBUTTON(name, xnum, wlnum)                                        \
-  case xnum:                                                                   \
-    this->m_delegate.onMouseDown(*this, m->event,                              \
-                                 hsh::offset2d(m->event_x, m->event_y),        \
-                                 MouseButton::name, m_keymap.getMods());       \
-    break;
-#define BOO2_XBUTTON_SCROLL(x, y, xnum)                                        \
-  case xnum:                                                                   \
-    this->m_delegate.onScroll(*this, m->event, hsh::offset2d(x, y),            \
-                              m_keymap.getMods());                             \
-    break;
-#include "XButtons.def"
-        default:
-          break;
-        }
-        break;
-      }
-      case XCB_BUTTON_RELEASE: {
-        auto* m = (xcb_button_release_event_t*)event;
-        switch (m->detail) {
-#define BOO2_XBUTTON(name, xnum, wlnum)                                        \
-  case xnum:                                                                   \
-    this->m_delegate.onMouseUp(*this, m->event,                                \
-                               hsh::offset2d(m->event_x, m->event_y),          \
-                               MouseButton::name, m_keymap.getMods());         \
-    break;
-#include "XButtons.def"
-        default:
-          break;
-        }
-        break;
-      }
-      case XCB_MOTION_NOTIFY: {
-        auto* m = (xcb_motion_notify_event_t*)event;
-        this->m_delegate.onMouseMove(*this, m->event,
-                                     hsh::offset2d(m->event_x, m->event_y),
-                                     m_keymap.getMods());
-        break;
-      }
-      case XCB_ENTER_NOTIFY: {
-        auto* m = (xcb_enter_notify_event_t*)event;
-        if (m->mode == XCB_NOTIFY_MODE_NORMAL)
-          this->m_delegate.onMouseEnter(*this, m->event,
-                                        hsh::offset2d(m->event_x, m->event_y),
-                                        m_keymap.getMods());
-        break;
-      }
-      case XCB_LEAVE_NOTIFY: {
-        auto* m = (xcb_leave_notify_event_t*)event;
-        if (m->mode == XCB_NOTIFY_MODE_NORMAL)
-          this->m_delegate.onMouseLeave(*this, m->event,
-                                        hsh::offset2d(m->event_x, m->event_y),
-                                        m_keymap.getMods());
-        break;
-      }
-      case XCB_CLIENT_MESSAGE: {
-        auto* m = (xcb_client_message_event_t*)event;
-        if (m->data.data32[0] == m_atoms.m_WM_DELETE_WINDOW)
-          this->m_delegate.onQuitRequest(*this);
-        break;
-      }
-      default:
-        if (opcode == m_xkbBaseEvent) {
-          switch (event->pad0) {
-          case XCB_XKB_NEW_KEYBOARD_NOTIFY:
-          case XCB_XKB_MAP_NOTIFY: {
-            m_keymap.setKeymap(m_conn, nullptr);
-            break;
-          }
-          case XCB_XKB_STATE_NOTIFY: {
-            m_keymap.updateModifiers((xcb_xkb_state_notify_event_t*)event);
-            break;
-          }
-          default:
-            break;
-          }
-        }
-        break;
-      }
-      free(event);
     }
 
     this->m_delegate.onAppExiting(*this);

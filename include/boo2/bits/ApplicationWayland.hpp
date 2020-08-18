@@ -132,9 +132,7 @@ template <class App> class WaylandWindowObjs {
 
   void setSurface(hsh::owner<hsh::surface>&& surface) noexcept {
     hshSurface = std::move(surface);
-    hshSurface.attach_decoration_lambda([this]() {
-      m_decorations.draw();
-    });
+    hshSurface.attach_decoration_lambda([this]() { m_decorations.draw(); });
   }
 
 public:
@@ -177,9 +175,7 @@ public:
 
   void toggleFullscreen() noexcept {
     if (!m_fullscreen) {
-      hshSurface.attach_decoration_lambda([this]() {
-        m_decorations.draw();
-      });
+      hshSurface.attach_decoration_lambda([this]() { m_decorations.draw(); });
       hshSurface.set_margins(0, 0, 0, 0);
       xdg_toplevel_set_fullscreen(xdgToplevel, nullptr);
       m_fullscreen = true;
@@ -243,10 +239,11 @@ template <class Application> class WindowWayland {
     return m_wl->hshSurface.operator bool();
   }
 
-  operator bool() const noexcept { return m_wl->getWlSurface() != nullptr; }
   operator wl_surface*() const noexcept { return m_wl->getWlSurface(); }
 
 public:
+  operator bool() const noexcept { return m_wl->getWlSurface() != nullptr; }
+
   using ID = wl_surface*;
   ID getID() const noexcept { return m_wl->getWlSurface(); }
   bool operator==(ID id) const noexcept { return m_wl->getWlSurface() == id; }
@@ -741,9 +738,15 @@ public:
     return window;
   }
 
-  void quit() noexcept { m_running = false; }
+  void dispatchLatestEvents() noexcept { displayDispatch(); }
+
+  void quit(int code = 0) noexcept {
+    m_running = false;
+    m_exitCode = code;
+  }
 
 private:
+  int m_exitCode = 0;
   bool m_running = true;
   bool m_buildingPipelines = false;
 
@@ -839,7 +842,7 @@ private:
 
     if (this->m_device)
       this->m_device.wait_idle();
-    return 0;
+    return m_exitCode;
   }
 
   template <typename... DelegateArgs>

@@ -57,34 +57,34 @@ elseif(NX)
   list(APPEND boo2_LIBS debug deko3dd optimized deko3d debug nxd optimized nx)
 else()
   include(FindPkgConfig)
-  pkg_check_modules(xcb IMPORTED_TARGET xcb xcb-icccm xcb-xkb xkbcommon-x11 xkbcommon)
-  if(xcb_FOUND)
-    list(APPEND boo2_LIBS PkgConfig::xcb)
-    list(APPEND boo2_DEFS VK_USE_PLATFORM_XCB_KHR)
-    message(STATUS "Enabling XCB")
+  if(TARGET PkgConfig::vk-xcb)
+    # xcb already linked via hsh
+    pkg_check_modules(xcb IMPORTED_TARGET xcb-icccm xcb-xkb xkbcommon-x11 xkbcommon)
+    if(xcb_FOUND)
+      list(APPEND boo2_LIBS PkgConfig::xcb)
+    endif()
   endif()
-  pkg_check_modules(wayland IMPORTED_TARGET wayland-client wayland-egl wayland-scanner wayland-protocols xkbcommon)
-  if(OFF AND wayland_FOUND)
-    list(APPEND boo2_LIBS PkgConfig::wayland)
-    list(APPEND boo2_DEFS VK_USE_PLATFORM_WAYLAND_KHR)
-    pkg_get_variable(WAYLAND_SCANNER_COMMAND wayland-scanner wayland_scanner)
-    pkg_get_variable(WAYLAND_REGISTRY_DIR wayland-protocols pkgdatadir)
-    macro(add_wayland_extension name path)
-      add_custom_command(OUTPUT ${name}-client-protocol.h ${name}-protocol.c
-              COMMAND "${WAYLAND_SCANNER_COMMAND}" ARGS
-              client-header "${WAYLAND_REGISTRY_DIR}/${path}" ${name}-client-protocol.h
-              COMMAND "${WAYLAND_SCANNER_COMMAND}" ARGS
-              private-code "${WAYLAND_REGISTRY_DIR}/${path}" ${name}-protocol.c
-              COMMENT "Generating ${name} extension sources")
-      list(APPEND boo2_SRCS ${name}-protocol.c)
-    endmacro()
-    add_wayland_extension(xdg-shell stable/xdg-shell/xdg-shell.xml)
-    add_wayland_extension(xdg-decoration unstable/xdg-decoration/xdg-decoration-unstable-v1.xml)
-    list(APPEND boo2_INCS "${CMAKE_CURRENT_BINARY_DIR}")
-    message(STATUS "Enabling Wayland")
-  endif()
-  if(NOT xcb_FOUND AND NOT wayland_FOUND)
-    message(FATAL_ERROR "Unable to locate development installations of XCB or Wayland")
+  if(TARGET PkgConfig::vk-wayland)
+    # wayland-client already linked via hsh
+    pkg_check_modules(wayland IMPORTED_TARGET wayland-egl wayland-scanner wayland-protocols xkbcommon)
+    if(wayland_FOUND)
+      list(APPEND boo2_LIBS PkgConfig::wayland)
+      pkg_get_variable(WAYLAND_SCANNER_COMMAND wayland-scanner wayland_scanner)
+      pkg_get_variable(WAYLAND_REGISTRY_DIR wayland-protocols pkgdatadir)
+      macro(add_wayland_extension name path)
+        add_custom_command(OUTPUT ${name}-client-protocol.h ${name}-protocol.c
+                COMMAND "${WAYLAND_SCANNER_COMMAND}" ARGS
+                client-header "${WAYLAND_REGISTRY_DIR}/${path}" ${name}-client-protocol.h
+                COMMAND "${WAYLAND_SCANNER_COMMAND}" ARGS
+                private-code "${WAYLAND_REGISTRY_DIR}/${path}" ${name}-protocol.c
+                COMMENT "Generating ${name} extension sources")
+        list(APPEND boo2_SRCS ${name}-protocol.c)
+      endmacro()
+      add_wayland_extension(xdg-shell stable/xdg-shell/xdg-shell.xml)
+      add_wayland_extension(xdg-decoration unstable/xdg-decoration/xdg-decoration-unstable-v1.xml)
+      list(APPEND boo2_INCS "${CMAKE_CURRENT_BINARY_DIR}")
+      message(STATUS "Enabling Wayland registry headers")
+    endif()
   endif()
   pkg_check_modules(pulse IMPORTED_TARGET libpulse)
   if(NOT pulse_FOUND)

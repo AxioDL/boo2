@@ -283,9 +283,7 @@ protected:
                                           m_delegate);
   }
 
-  ~ApplicationPosix() noexcept {
-    WindowDecorations::shutdown();
-  }
+  ~ApplicationPosix() noexcept { WindowDecorations::shutdown(); }
 };
 
 } // namespace boo2
@@ -309,12 +307,15 @@ public:
   static int exec(int argc, SystemChar** argv, SystemStringView appName,
                   DelegateArgs&&... args) noexcept {
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
-    wl_log_set_handler_client(ApplicationWayland<Delegate>::wl_log_handler);
-    if (wl_display* display = wl_display_connect(nullptr)) {
-      int ret = ApplicationWayland<Delegate>::exec(
-          display, argc, argv, appName, std::forward<DelegateArgs>(args)...);
-      wl_display_disconnect(display);
-      return ret;
+    const char* UseWayland = getenv("BOO2_USE_WAYLAND");
+    if (!UseWayland || UseWayland[0] == '1') {
+      wl_log_set_handler_client(ApplicationWayland<Delegate>::wl_log_handler);
+      if (wl_display* display = wl_display_connect(nullptr)) {
+        int ret = ApplicationWayland<Delegate>::exec(
+            display, argc, argv, appName, std::forward<DelegateArgs>(args)...);
+        wl_display_disconnect(display);
+        return ret;
+      }
     }
 #endif
 

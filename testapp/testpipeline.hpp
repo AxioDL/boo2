@@ -4,7 +4,7 @@
 
 struct MyFormat {
   hsh::float3 position;
-  hsh::float3 normal;
+  hsh::float4 color;
 };
 
 struct UniformData {
@@ -16,10 +16,7 @@ struct UniformData {
 };
 
 struct Binding {
-  hsh::dynamic_owner<hsh::uniform_buffer<UniformData>> Uniform;
-  hsh::owner<hsh::vertex_buffer<MyFormat>> VBO;
   hsh::owner<hsh::texture2d> Tex;
   hsh::binding Binding;
+  hsh::binding& Bind(hsh::uniform_buffer<UniformData> u, hsh::vertex_buffer<MyFormat> v);
 };
-
-Binding BuildPipeline();

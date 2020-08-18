@@ -9,7 +9,10 @@ template <class App, class Win>
 class Delegate : public boo2::DelegateBase<App, Win> {
   Win m_window;
   hsh::owner<hsh::render_texture2d> m_renderTexture;
-  Binding PipelineBind{};
+  hsh::uniform_fifo m_uFifo;
+  hsh::vertex_fifo m_vFifo;
+  Binding m_pipelineBind{};
+  std::size_t CurColor = 0;
 
 #if __SWITCH__
   static constexpr int W = 1280;
@@ -28,24 +31,40 @@ public:
       return;
     }
     m_renderTexture = hsh::create_render_texture2d(m_window);
+
+    m_uFifo = hsh::create_uniform_fifo(sizeof(UniformData) + 256);
+    m_vFifo = hsh::create_vertex_fifo(sizeof(MyFormat) * 3 * 2);
   }
 
   void onAppIdle(App& a) noexcept {
-    if (!PipelineBind.Binding) {
-      PipelineBind = BuildPipeline();
-
-      UniformData UniData{};
-      UniData.xf[0][0] = 1.f;
-      UniData.xf[1][1] = 1.f;
-      UniData.xf[2][2] = 1.f;
-      UniData.xf[3][3] = 1.f;
-      PipelineBind.Uniform.load(UniData);
-    }
-
     if (m_window.acquireNextImage()) {
+      a.dispatchLatestEvents();
       m_renderTexture.attach();
       hsh::clear_attachments();
-      PipelineBind.Binding.draw(0, 3);
+
+      constexpr std::array<hsh::float4, 7> Rainbow{{{1.f, 0.f, 0.f, 1.f},
+                                                       {1.f, 0.5f, 0.f, 1.f},
+                                                       {1.f, 1.f, 0.f, 1.f},
+                                                       {0.f, 1.f, 0.f, 1.f},
+                                                       {0.f, 1.f, 1.f, 1.f},
+                                                       {0.f, 0.f, 1.f, 1.f},
+                                                       {0.5f, 0.f, 1.f, 1.f}}};
+
+      auto uData = m_uFifo.map<UniformData>([](UniformData& Data) {
+        Data = UniformData{};
+        Data.xf[0][0] = 1.f;
+        Data.xf[1][1] = 1.f;
+        Data.xf[2][2] = 1.f;
+        Data.xf[3][3] = 1.f;
+      });
+      auto vData = m_vFifo.map<MyFormat>(3, [&](MyFormat* Data) {
+        Data[0] = MyFormat{hsh::float3{-1.f, -1.f, 0.f}, Rainbow[CurColor]};
+        Data[1] = MyFormat{hsh::float3{ 1.f, -1.f, 0.f}, Rainbow[(CurColor + 1) % Rainbow.size()]};
+        Data[2] = MyFormat{hsh::float3{ 1.f,  1.f, 0.f}, Rainbow[(CurColor + 2) % Rainbow.size()]};
+      });
+      CurColor = (CurColor + 1) % Rainbow.size();
+      m_pipelineBind.Bind(uData, vData).draw(0, 3);
+
       m_renderTexture.resolve_surface(m_window);
     }
   }
@@ -61,11 +80,10 @@ public:
   bool onAcceptDeviceRequest(
       App& a, const vk::PhysicalDeviceProperties& props,
       const vk::PhysicalDeviceDriverProperties& driverProps) noexcept {
-    if (driverProps.driverID == vk::DriverId::eMesaRadv)
-      return true;
-    // if (driverProps.driverID == vk::DriverId::eAmdOpenSource)
-    //  return true;
-    return false;
+    return true;
+    if (driverProps.driverID == vk::DriverId::eAmdOpenSource)
+      return false;
+    return true;
   }
 #endif
 

@@ -76,10 +76,8 @@ void WindowDecorations::_update() noexcept {
           std::memcpy(data, window_decorations.pixel_data, size);
         });
   }
-  if (!m_vbo) {
-    m_vbo = hsh::create_dynamic_vertex_buffer<Vert>(24);
-    m_binding.hsh_bind(
-        DecorationPipeline(m_vbo.get(), m_ibo.get(), m_tex.get()));
+  if (!m_vFifo) {
+    m_vFifo = hsh::create_vertex_fifo(sizeof(Vert) * 24 * 2);
   }
 
   const auto w = float(m_extent.w);
@@ -91,7 +89,7 @@ void WindowDecorations::_update() noexcept {
   constexpr float BottomEdgeUvOff = 56 / 256.f;
 
   auto normalizePos = [=](const hsh::offset2d& offset) {
-    return hsh::float2(offset.x * 2 / w - 1.f, offset.y * 2 / h - 1.f);
+    return hsh::float2(offset.x * 2 / w - 1.f, -offset.y * 2 / h + 1.f);
   };
   auto normalizeVert = [&](const hsh::offset2d& offset, float uvx, float uvy) {
     return Vert{normalizePos(offset), hsh::float2{uvx, uvy}};
@@ -122,12 +120,13 @@ void WindowDecorations::_update() noexcept {
         corner & 0x1u ? 1.f - EdgeUvOff : EdgeUvOff, 0.5f);
   };
 
-  Vert* verts = m_vbo.map();
-  updateCorner(verts + 0, verts + 16, 0x0);
-  updateCorner(verts + 4, verts + 18, 0x1);
-  updateCorner(verts + 8, verts + 20, 0x2);
-  updateCorner(verts + 12, verts + 22, 0x3);
-  m_vbo.unmap();
+  auto vData = m_vFifo.map<Vert>(24, [&](Vert* verts) {
+    updateCorner(verts + 0, verts + 16, 0x0);
+    updateCorner(verts + 4, verts + 18, 0x1);
+    updateCorner(verts + 8, verts + 20, 0x2);
+    updateCorner(verts + 12, verts + 22, 0x3);
+  });
+  m_binding.hsh_bind(DecorationPipeline(vData, m_ibo.get(), m_tex.get()));
 
   m_dirty = false;
 }

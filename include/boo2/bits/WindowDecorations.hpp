@@ -16,7 +16,7 @@ public:
   static constexpr int32_t MarginB = 56;
 
 private:
-  hsh::dynamic_owner<hsh::vertex_buffer<Vert>> m_vbo;
+  hsh::vertex_fifo m_vFifo;
   static hsh::owner<hsh::index_buffer<uint16_t>> m_ibo;
   static hsh::owner<hsh::texture2d> m_tex;
   hsh::binding m_binding;
