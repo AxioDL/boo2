@@ -6,10 +6,8 @@ endif()
 
 project(boo2 LANGUAGES C CXX VERSION 0.1)
 
-if(NOT MSVC)
-  set(CMAKE_CXX_STANDARD 20)
-  set(CMAKE_CXX_STANDARD_REQUIRED ON)
-endif()
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(NOT TARGET logvisor)
   add_subdirectory(logvisor)
@@ -52,6 +50,7 @@ set(boo2_DEFS "")
 set(boo2_INCS include)
 
 if(WIN32)
+  list(APPEND boo2_LIBS Dwmapi)
 elseif(APPLE)
 elseif(NX)
   list(APPEND boo2_LIBS debug deko3dd optimized deko3d debug nxd optimized nx)

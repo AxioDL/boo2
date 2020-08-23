@@ -1,6 +1,7 @@
 #pragma once
 
 #ifdef _WIN32
+#define NOMINMAX
 #include <winapifamily.h>
 #if defined(WINAPI_FAMILY) && WINAPI_FAMILY != WINAPI_FAMILY_DESKTOP_APP
 #define WINDOWS_STORE 1
@@ -9,14 +10,9 @@
 #endif
 
 #include <windows.h>
-#include <D3Dcommon.h>
 #include <wrl/client.h>
 template <class T>
 using ComPtr = Microsoft::WRL::ComPtr<T>;
-template <class T>
-static inline ComPtr<T>* ReferenceComPtr(ComPtr<T>& ptr) {
-  return reinterpret_cast<ComPtr<T>*>(ptr.GetAddressOf());
-}
 #endif
 
 #include <string>
@@ -61,20 +57,14 @@ static inline ComPtr<T>* ReferenceComPtr(ComPtr<T>& ptr) {
 
 namespace boo2 {
 
-#ifdef _WIN32
+#ifdef UNICODE
 using SystemString = std::wstring;
 using SystemStringView = std::wstring_view;
 using SystemChar = wchar_t;
-#ifndef _SYS_STR
-#define _SYS_STR(val) L##val
-#endif
 #else
 using SystemString = std::string;
 using SystemStringView = std::string_view;
 using SystemChar = char;
-#ifndef _SYS_STR
-#define _SYS_STR(val) val
-#endif
 #endif
 
 #ifndef NDEBUG

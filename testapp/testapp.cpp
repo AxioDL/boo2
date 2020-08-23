@@ -25,7 +25,7 @@ class Delegate : public boo2::DelegateBase<App, Win> {
 public:
   void onAppLaunched(App& a) noexcept {
     std::cout << "launch" << std::endl;
-    m_window = a.createWindow(_SYS_STR("Hello World!"sv), 0, 0, W, H);
+    m_window = a.createWindow(TEXT("Hello World!"sv), 0, 0, W, H);
     if (!m_window) {
       a.quit(1);
       return;
@@ -62,7 +62,7 @@ public:
         Data[1] = MyFormat{hsh::float3{ 1.f, -1.f, 0.f}, Rainbow[(CurColor + 1) % Rainbow.size()]};
         Data[2] = MyFormat{hsh::float3{ 1.f,  1.f, 0.f}, Rainbow[(CurColor + 2) % Rainbow.size()]};
       });
-      CurColor = (CurColor + 1) % Rainbow.size();
+      //CurColor = (CurColor + 1) % Rainbow.size();
       m_pipelineBind.Bind(uData, vData).draw(0, 3);
 
       m_renderTexture.resolve_surface(m_window);
@@ -108,8 +108,12 @@ public:
   }
 };
 
+#ifdef UNICODE
+int wmain(int argc, wchar_t** argv) noexcept {
+#else
 int main(int argc, char** argv) noexcept {
+#endif
   logvisor::RegisterStandardExceptions();
   logvisor::RegisterConsoleLogger();
-  return boo2::Application<Delegate>::exec(argc, argv, "boo2_testapp"sv);
+  return boo2::Application<Delegate>::exec(argc, argv, TEXT("boo2_testapp"sv));
 }

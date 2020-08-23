@@ -3,6 +3,7 @@
 #include "System.hpp"
 
 #ifdef _WIN32
+#include "bits/ApplicationWin32.hpp"
 #elif __APPLE__
 #elif __SWITCH__
 #include "bits/ApplicationNx.hpp"
@@ -13,6 +14,8 @@
 namespace boo2 {
 
 #ifdef _WIN32
+template <template <class, class> class Delegate>
+using Application = ApplicationWin32Exec<Delegate>;
 #elif __APPLE__
 #elif __SWITCH__
 template <template <class, class> class Delegate>

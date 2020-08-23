@@ -112,7 +112,7 @@ public:
         utfFunc(keysym, mods);
       } else {
         switch (key - 8) {
-#define BOO2_SPECIAL_KEYCODE(name, xkbcode)                                    \
+#define BOO2_SPECIAL_KEYCODE(name, xkbcode, vkcode)                            \
   case xkbcode:                                                                \
     specialFunc(Keycode::name, mods);                                          \
     break;
@@ -200,11 +200,11 @@ public:
   }
 
   SystemString getDataPath(SystemStringView subPath) const noexcept {
-    return fmt::format(FMT_STRING("{}/{}"), m_config, subPath);
+    return fmt::format(FMT_STRING("{}/{}"), m_data, subPath);
   }
 
   SystemString getCachePath(SystemStringView subPath) const noexcept {
-    return fmt::format(FMT_STRING("{}/{}"), m_config, subPath);
+    return fmt::format(FMT_STRING("{}/{}"), m_cache, subPath);
   }
 };
 

@@ -115,8 +115,9 @@ protected:
 
 #endif
 
+#undef DELETE
 enum class Keycode {
-#define BOO2_SPECIAL_KEYCODE(name, code) name,
+#define BOO2_SPECIAL_KEYCODE(name, xkbcode, vkcode) name,
 #include "SpecialKeycodes.def"
 };
 

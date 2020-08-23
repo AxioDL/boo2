@@ -7,8 +7,8 @@ extern const struct WindowDecorationsRes {
   unsigned int width;
   unsigned int height;
   unsigned int bytes_per_pixel; /* 2:RGB16, 3:RGB, 4:RGBA */
-  unsigned char pixel_data[];
 } window_decorations;
+extern const unsigned char window_decorations_data[];
 
 using namespace hsh::pipeline;
 
@@ -73,7 +73,7 @@ void WindowDecorations::_update() noexcept {
     m_tex = hsh::create_texture2d(
         {window_decorations.width, window_decorations.height}, hsh::RGBA8_UNORM,
         1, [](void* data, size_t size) {
-          std::memcpy(data, window_decorations.pixel_data, size);
+          std::memcpy(data, window_decorations_data, size);
         });
   }
   if (!m_vFifo) {
@@ -138,7 +138,7 @@ void WindowDecorations::update(const hsh::extent2d& extent) noexcept {
 
 void WindowDecorations::draw() noexcept {
   _update();
-  m_binding.draw_indexed(0, Indices.size());
+  m_binding.draw_indexed(0, uint32_t(Indices.size()));
 }
 
 void WindowDecorations::shutdown() noexcept {

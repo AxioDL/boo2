@@ -472,15 +472,7 @@ private:
     this->m_delegate.onAppLaunched(*this);
 
     while (m_running) {
-      if (m_pendingFlush) {
-        m_pendingFlush = false;
-        xcb_flush(m_conn);
-      }
-
-      while (xcb_generic_event_t* event = xcb_poll_for_event(m_conn)) {
-        dispatchEvent(event);
-        free(event);
-      }
+      dispatchLatestEvents();
 
       if (this->m_device) {
         this->m_device.enter_draw_context([this]() {
