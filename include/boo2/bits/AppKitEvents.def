@@ -1,0 +1,22 @@
+#ifndef APPKIT_EVENT
+#define APPKIT_EVENT(name)
+#endif
+
+APPKIT_EVENT(mouseDown)
+APPKIT_EVENT(rightMouseDown)
+APPKIT_EVENT(otherMouseDown)
+APPKIT_EVENT(mouseUp)
+APPKIT_EVENT(rightMouseUp)
+APPKIT_EVENT(otherMouseUp)
+APPKIT_EVENT(mouseMoved)
+APPKIT_EVENT(mouseDragged)
+APPKIT_EVENT(scrollWheel)
+APPKIT_EVENT(rightMouseDragged)
+APPKIT_EVENT(otherMouseDragged)
+APPKIT_EVENT(mouseEntered)
+APPKIT_EVENT(mouseExited)
+APPKIT_EVENT(keyDown)
+APPKIT_EVENT(keyUp)
+APPKIT_EVENT(flagsChanged)
+
+#undef APPKIT_EVENT

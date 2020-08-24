@@ -643,8 +643,6 @@ template <template <class, class> class Delegate>
 logvisor::Module ApplicationWin32<Delegate>::Log("boo2::ApplicationWin32");
 
 template <template <class, class> class Delegate> class ApplicationWin32Exec {
-  static logvisor::Module Log;
-
 public:
   template <typename... DelegateArgs>
   static int exec(int argc, SystemChar** argv, SystemStringView appName,
@@ -653,8 +651,5 @@ public:
         argc, argv, appName, std::forward<DelegateArgs>(args)...);
   }
 };
-template <template <class, class> class Delegate>
-logvisor::Module
-    ApplicationWin32Exec<Delegate>::Log("boo2::ApplicationWin32Exec");
 
 } // namespace boo2

@@ -2,9 +2,26 @@ cmake_minimum_required(VERSION 3.10 FATAL_ERROR) # because of c++17
 
 if(BOO2_NX)
   set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_LIST_DIR}/cmake/nx.cmake")
+elseif(BOO2_MAC_CATALYST)
+  set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_LIST_DIR}/cmake/macCatalyst.cmake")
 endif()
 
-project(boo2 LANGUAGES C CXX VERSION 0.1)
+if(APPLE)
+  set(OPTIONAL_OBJCXX OBJCXX)
+endif()
+
+project(boo2 LANGUAGES C CXX ${OPTIONAL_OBJCXX} VERSION 0.1)
+
+if(CMAKE_SYSTEM_NAME STREQUAL iOS)
+  foreach(lang C CXX OBJC OBJCXX)
+    set(CMAKE_${lang}_COMPILER_TARGET arm64-apple-ios14)
+  endforeach()
+  if(CMAKE_OSX_SYSROOT AND NOT EXISTS CMAKE_OSX_SYSROOT)
+    execute_process(COMMAND xcrun --sdk iphoneos --show-sdk-path
+        OUTPUT_VARIABLE CMAKE_OSX_SYSROOT
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+  endif()
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,7 +38,7 @@ endif()
 add_subdirectory(lib/audiodev/soxr/src)
 
 set(boo2_SRCS
-  lib/ApplicationCommon.cpp
+  lib/Boo2Implementation.cpp
   lib/HshImplementation.cpp
   lib/WindowDecorations.cpp
   lib/WindowDecorationsRes.cpp
@@ -52,6 +69,18 @@ set(boo2_INCS include)
 if(WIN32)
   list(APPEND boo2_LIBS Dwmapi)
 elseif(APPLE)
+  if(NOT BOO2_MAC_CATALYST AND metal-bin-mac IN_LIST HSH_TARGETS)
+    find_library(APPKIT_LIB AppKit)
+    list(APPEND boo2_LIBS ${APPKIT_LIB})
+    list(APPEND boo2_INCS ${APPKIT_LIB})
+  elseif(BOO2_MAC_CATALYST OR metal-bin-ios IN_LIST HSH_TARGETS)
+    find_library(FOUNDATION_LIB Foundation)
+    list(APPEND boo2_LIBS ${FOUNDATION_LIB})
+    list(APPEND boo2_INCS ${FOUNDATION_LIB})
+    find_library(UIKIT_LIB UIKit)
+    list(APPEND boo2_LIBS ${UIKIT_LIB})
+    list(APPEND boo2_INCS ${UIKIT_LIB})
+  endif()
 elseif(NX)
   list(APPEND boo2_LIBS debug deko3dd optimized deko3d debug nxd optimized nx)
 else()

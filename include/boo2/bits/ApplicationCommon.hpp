@@ -1,7 +1,7 @@
 #pragma once
 
-#include "boo2/System.hpp"
 #include "WindowDecorations.hpp"
+#include "boo2/System.hpp"
 
 #include <hsh/hsh.h>
 #include <logvisor/logvisor.hpp>
@@ -12,19 +12,10 @@ namespace boo2 {
 
 extern std::vector<SystemString> Args;
 extern SystemString AppName;
-
-class ApplicationBase {
-protected:
-  explicit ApplicationBase(int argc, SystemChar** argv,
-                           SystemStringView appName) noexcept {
-    if (argc > 1) {
-      Args.reserve(argc - 1);
-      for (int i = 1; i < argc; ++i)
-        Args.emplace_back(argv[i]);
-    }
-    AppName = appName;
-  }
-};
+#ifdef BOO2_IMPLEMENTATION
+std::vector<SystemString> Args;
+SystemString AppName;
+#endif
 
 #if HSH_ENABLE_VULKAN
 
@@ -71,18 +62,81 @@ public:
               return delegate.onAcceptDeviceRequest(a, props, driverProps);
             },
             checkSurface)) {}
+  template <class PCFM>
+  using BuildPump = hsh::vulkan_device_owner::pipeline_build_pump<PCFM>;
 };
 
-template <class PCFM> class ApplicationVulkan {
-protected:
-  VulkanInstance m_instance;
-  VulkanDevice m_device;
+struct VulkanTraits {
+  using Instance = VulkanInstance;
+  using Device = VulkanDevice;
+};
 
-  hsh::vulkan_device_owner::pipeline_build_pump<PCFM> m_buildPump;
+#endif
+
+#if HSH_ENABLE_METAL
+
+class MetalInstance : public hsh::metal_instance_owner {
+  static logvisor::Module Log;
+
+  static void handleError(NSError* error) noexcept {
+    Log.report(logvisor::Fatal, FMT_STRING("Metal: {}"),
+               error.localizedDescription.UTF8String);
+  }
+
+public:
+  explicit MetalInstance(SystemStringView appName) noexcept
+      : hsh::metal_instance_owner(hsh::create_metal_instance(&handleError)) {}
+};
+inline logvisor::Module MetalInstance::Log("boo2::MetalInstance");
+
+class MetalDevice : public hsh::metal_device_owner {
+public:
+  MetalDevice() noexcept = default;
+  template <typename App, typename Delegate>
+  MetalDevice(const MetalInstance& instance, App& a, Delegate& delegate,
+              CAMetalLayer* checkSurface = {}) noexcept
+      : hsh::metal_device_owner(instance.enumerate_metal_devices(
+            [&](id<MTLDevice> device, bool nativeForPhysSurface) {
+              return delegate.onAcceptDeviceRequest(a, device,
+                                                    nativeForPhysSurface);
+            },
+            checkSurface)) {}
+  template <class PCFM>
+  using BuildPump = hsh::metal_device_owner::pipeline_build_pump<PCFM>;
+};
+
+struct MetalTraits {
+  using Instance = MetalInstance;
+  using Device = MetalDevice;
+};
+
+#endif
+
+template <class RHITraits, class PCFM> class ApplicationBase {
+protected:
+  typename RHITraits::Instance m_instance;
+  typename RHITraits::Device m_device;
+
+  typename RHITraits::Device::template BuildPump<PCFM> m_buildPump;
+
+  explicit ApplicationBase(SystemStringView appName) noexcept
+      : m_instance(appName) {
+    AppName = appName;
+  }
+
+  explicit ApplicationBase(int argc, SystemChar** argv,
+                           SystemStringView appName) noexcept
+      : m_instance(appName) {
+    if (argc > 1) {
+      Args.reserve(argc - 1);
+      for (int i = 1; i < argc; ++i)
+        Args.emplace_back(argv[i]);
+    }
+    AppName = appName;
+  }
 
   template <class App, class Delegate>
-  bool pumpBuildVulkanPipelines(PCFM& pcfm, App& a,
-                                Delegate& delegate) noexcept {
+  bool pumpBuildRHIPipelines(PCFM& pcfm, App& a, Delegate& delegate) noexcept {
     std::size_t done, count;
 
     if (!m_buildPump) {
@@ -108,16 +162,11 @@ protected:
     delegate.onEndBuildPipelines(a, done, count);
     return false;
   }
-
-  explicit ApplicationVulkan(SystemStringView appName) noexcept
-      : m_instance(appName) {}
 };
-
-#endif
 
 #undef DELETE
 enum class Keycode {
-#define BOO2_SPECIAL_KEYCODE(name, xkbcode, vkcode) name,
+#define BOO2_SPECIAL_KEYCODE(name, xkbcode, vkcode, maccode, ioscode) name,
 #include "SpecialKeycodes.def"
 };
 

@@ -5,6 +5,12 @@
 #ifdef _WIN32
 #include "bits/ApplicationWin32.hpp"
 #elif __APPLE__
+#include <TargetConditionals.h>
+#if TARGET_OS_OSX
+#include "bits/ApplicationAppKit.hpp"
+#elif TARGET_OS_IOS
+#include "bits/ApplicationUIKit.hpp"
+#endif
 #elif __SWITCH__
 #include "bits/ApplicationNx.hpp"
 #else
@@ -17,6 +23,13 @@ namespace boo2 {
 template <template <class, class> class Delegate>
 using Application = ApplicationWin32Exec<Delegate>;
 #elif __APPLE__
+#if TARGET_OS_OSX
+template <template <class, class> class Delegate>
+using Application = ApplicationAppKitExec<Delegate>;
+#elif TARGET_OS_IOS
+template <template <class, class> class Delegate>
+using Application = ApplicationUIKitExec<Delegate>;
+#endif
 #elif __SWITCH__
 template <template <class, class> class Delegate>
 using Application = ApplicationNxExec<Delegate>;
@@ -36,6 +49,13 @@ public:
   bool onAcceptDeviceRequest(
       App& a, const vk::PhysicalDeviceProperties& props,
       const vk::PhysicalDeviceDriverProperties& driverProps) noexcept {
+    return true;
+  }
+#endif
+
+#if HSH_ENABLE_METAL
+  bool onAcceptDeviceRequest(App& a, id<MTLDevice> device,
+                             bool nativeForPhysSurface) noexcept {
     return true;
   }
 #endif

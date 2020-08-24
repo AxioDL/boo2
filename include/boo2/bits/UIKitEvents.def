@@ -1,0 +1,19 @@
+#ifndef UIKIT_EVENT
+#define UIKIT_EVENT(name, objtype, eventtype)
+#endif
+
+UIKIT_EVENT(touchesBegan, NSSet<UITouch *>*, UIEvent*)
+UIKIT_EVENT(touchesMoved, NSSet<UITouch *>*, UIEvent*)
+UIKIT_EVENT(touchesEnded, NSSet<UITouch *>*, UIEvent*)
+UIKIT_EVENT(touchesCancelled, NSSet<UITouch *>*, UIEvent*)
+
+UIKIT_EVENT(pressesBegan, NSSet<UIPress *>*, UIPressesEvent*)
+UIKIT_EVENT(pressesChanged, NSSet<UIPress *>*, UIPressesEvent*)
+UIKIT_EVENT(pressesEnded, NSSet<UIPress *>*, UIPressesEvent*)
+UIKIT_EVENT(pressesCancelled, NSSet<UIPress *>*, UIPressesEvent*)
+
+UIKIT_EVENT(motionBegan, UIEventSubtype, UIEvent*)
+UIKIT_EVENT(motionEnded, UIEventSubtype, UIEvent*)
+UIKIT_EVENT(motionCancelled, UIEventSubtype, UIEvent*)
+
+#undef UIKIT_EVENT

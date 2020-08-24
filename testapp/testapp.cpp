@@ -32,7 +32,7 @@ public:
     }
     m_renderTexture = hsh::create_render_texture2d(m_window);
 
-    m_uFifo = hsh::create_uniform_fifo(sizeof(UniformData) + 256);
+    m_uFifo = hsh::create_uniform_fifo(512);
     m_vFifo = hsh::create_vertex_fifo(sizeof(MyFormat) * 3 * 2);
   }
 
@@ -43,12 +43,12 @@ public:
       hsh::clear_attachments();
 
       constexpr std::array<hsh::float4, 7> Rainbow{{{1.f, 0.f, 0.f, 1.f},
-                                                       {1.f, 0.5f, 0.f, 1.f},
-                                                       {1.f, 1.f, 0.f, 1.f},
-                                                       {0.f, 1.f, 0.f, 1.f},
-                                                       {0.f, 1.f, 1.f, 1.f},
-                                                       {0.f, 0.f, 1.f, 1.f},
-                                                       {0.5f, 0.f, 1.f, 1.f}}};
+                                                    {1.f, 0.5f, 0.f, 1.f},
+                                                    {1.f, 1.f, 0.f, 1.f},
+                                                    {0.f, 1.f, 0.f, 1.f},
+                                                    {0.f, 1.f, 1.f, 1.f},
+                                                    {0.f, 0.f, 1.f, 1.f},
+                                                    {0.5f, 0.f, 1.f, 1.f}}};
 
       auto uData = m_uFifo.map<UniformData>([](UniformData& Data) {
         Data = UniformData{};
@@ -59,10 +59,12 @@ public:
       });
       auto vData = m_vFifo.map<MyFormat>(3, [&](MyFormat* Data) {
         Data[0] = MyFormat{hsh::float3{-1.f, -1.f, 0.f}, Rainbow[CurColor]};
-        Data[1] = MyFormat{hsh::float3{ 1.f, -1.f, 0.f}, Rainbow[(CurColor + 1) % Rainbow.size()]};
-        Data[2] = MyFormat{hsh::float3{ 1.f,  1.f, 0.f}, Rainbow[(CurColor + 2) % Rainbow.size()]};
+        Data[1] = MyFormat{hsh::float3{1.f, -1.f, 0.f},
+                           Rainbow[(CurColor + 1) % Rainbow.size()]};
+        Data[2] = MyFormat{hsh::float3{1.f, 1.f, 0.f},
+                           Rainbow[(CurColor + 2) % Rainbow.size()]};
       });
-      //CurColor = (CurColor + 1) % Rainbow.size();
+      // CurColor = (CurColor + 1) % Rainbow.size();
       m_pipelineBind.Bind(uData, vData).draw(0, 3);
 
       m_renderTexture.resolve_surface(m_window);
@@ -83,6 +85,13 @@ public:
     return true;
     if (driverProps.driverID == vk::DriverId::eAmdOpenSource)
       return false;
+    return true;
+  }
+#endif
+
+#if HSH_ENABLE_METAL
+  bool onAcceptDeviceRequest(App& a, id<MTLDevice> device,
+                             bool nativeForPhysSurface) noexcept {
     return true;
   }
 #endif

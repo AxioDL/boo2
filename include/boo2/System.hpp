@@ -11,8 +11,7 @@
 
 #include <windows.h>
 #include <wrl/client.h>
-template <class T>
-using ComPtr = Microsoft::WRL::ComPtr<T>;
+template <class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 #endif
 
 #include <string>
@@ -23,36 +22,38 @@ using ComPtr = Microsoft::WRL::ComPtr<T>;
 #include <fmt/format.h>
 
 #ifndef ENABLE_BITWISE_ENUM
-#define ENABLE_BITWISE_ENUM(type)                                                                                      \
-  constexpr type operator|(type a, type b) noexcept {                                                                  \
-    using T = std::underlying_type_t<type>;                                                                            \
-    return type(static_cast<T>(a) | static_cast<T>(b));                                                                \
-  }                                                                                                                    \
-  constexpr type operator&(type a, type b) noexcept {                                                                  \
-    using T = std::underlying_type_t<type>;                                                                            \
-    return type(static_cast<T>(a) & static_cast<T>(b));                                                                \
-  }                                                                                                                    \
-  constexpr type& operator|=(type& a, type b) noexcept {                                                               \
-    using T = std::underlying_type_t<type>;                                                                            \
-    a = type(static_cast<T>(a) | static_cast<T>(b));                                                                   \
-    return a;                                                                                                          \
-  }                                                                                                                    \
-  constexpr type& operator&=(type& a, type b) noexcept {                                                               \
-    using T = std::underlying_type_t<type>;                                                                            \
-    a = type(static_cast<T>(a) & static_cast<T>(b));                                                                   \
-    return a;                                                                                                          \
-  }                                                                                                                    \
-  constexpr type operator~(type key) noexcept {                                                                        \
-    using T = std::underlying_type_t<type>;                                                                            \
-    return type(~static_cast<T>(key));                                                                                 \
-  }                                                                                                                    \
-  constexpr bool True(type key) noexcept {                                                                             \
-    using T = std::underlying_type_t<type>;                                                                            \
-    return static_cast<T>(key) != 0;                                                                                   \
-  }                                                                                                                    \
-  constexpr bool False(type key) noexcept {                                                                            \
-    return !True(key);                                                                                                 \
-  }
+#define ENABLE_BITWISE_ENUM(type)                                              \
+  constexpr type operator|(type a, type b) noexcept {                          \
+    using T = std::underlying_type_t<type>;                                    \
+    return type(static_cast<T>(a) | static_cast<T>(b));                        \
+  }                                                                            \
+  constexpr type operator&(type a, type b) noexcept {                          \
+    using T = std::underlying_type_t<type>;                                    \
+    return type(static_cast<T>(a) & static_cast<T>(b));                        \
+  }                                                                            \
+  constexpr type operator^(type a, type b) noexcept {                          \
+    using T = std::underlying_type_t<type>;                                    \
+    return type(static_cast<T>(a) ^ static_cast<T>(b));                        \
+  }                                                                            \
+  constexpr type& operator|=(type& a, type b) noexcept {                       \
+    using T = std::underlying_type_t<type>;                                    \
+    a = type(static_cast<T>(a) | static_cast<T>(b));                           \
+    return a;                                                                  \
+  }                                                                            \
+  constexpr type& operator&=(type& a, type b) noexcept {                       \
+    using T = std::underlying_type_t<type>;                                    \
+    a = type(static_cast<T>(a) & static_cast<T>(b));                           \
+    return a;                                                                  \
+  }                                                                            \
+  constexpr type operator~(type key) noexcept {                                \
+    using T = std::underlying_type_t<type>;                                    \
+    return type(~static_cast<T>(key));                                         \
+  }                                                                            \
+  constexpr bool True(type key) noexcept {                                     \
+    using T = std::underlying_type_t<type>;                                    \
+    return static_cast<T>(key) != 0;                                           \
+  }                                                                            \
+  constexpr bool False(type key) noexcept { return !True(key); }
 #endif
 
 namespace boo2 {
@@ -61,26 +62,16 @@ namespace boo2 {
 using SystemString = std::wstring;
 using SystemStringView = std::wstring_view;
 using SystemChar = wchar_t;
+#ifndef TEXT
+#define TEXT(txt) L##txt
+#endif
 #else
 using SystemString = std::string;
 using SystemStringView = std::string_view;
 using SystemChar = char;
+#ifndef TEXT
+#define TEXT(txt) txt
 #endif
-
-#ifndef NDEBUG
-#define __BooTraceArgs , const char *file, int line
-#define __BooTraceArgsUse , file, line
-#define __BooTraceInitializer , m_file(file), m_line(line)
-#define __BooTraceFields                                                                                               \
-  const char* m_file;                                                                                                  \
-  int m_line;
-#define BooTrace , __FILE__, __LINE__
-#else
-#define __BooTraceArgs
-#define __BooTraceArgsUse
-#define __BooTraceInitializer
-#define __BooTraceFields
-#define BooTrace
 #endif
 
 } // namespace boo2
