@@ -1,5 +1,5 @@
-#include "lib/audiodev/AudioMatrix.hpp"
-#include "lib/audiodev/AudioVoiceEngine.hpp"
+#include "AudioMatrix.hpp"
+#include "AudioVoiceEngine.hpp"
 
 #include <immintrin.h>
 

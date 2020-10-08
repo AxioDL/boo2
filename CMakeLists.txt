@@ -44,6 +44,7 @@ set(boo2_SRCS
   lib/WindowDecorationsRes.cpp
   lib/audiodev/AudioSubmix.cpp
   lib/audiodev/AudioVoice.cpp
+  lib/audiodev/AudioMatrixSSE.cpp
   lib/audiodev/AudioVoiceEngine.cpp
   lib/audiodev/LtRtProcessing.cpp
   lib/audiodev/MIDICommon.cpp

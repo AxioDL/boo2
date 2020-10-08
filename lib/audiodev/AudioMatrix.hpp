@@ -9,6 +9,8 @@
 #include <immintrin.h>
 #endif
 
+#include "boo2/audiodev/IAudioVoice.hpp"
+
 namespace boo2 {
 struct AudioVoiceEngineMixInfo;
 

@@ -1,11 +1,22 @@
 #include "boo2/inputdev/DeviceSignature.hpp"
 #include "boo2/inputdev/DeviceToken.hpp"
 #include "boo2/inputdev/GenericPad.hpp"
+#include "boo2/inputdev/DolphinSmashAdapter.hpp"
+#include "boo2/inputdev/DualshockPad.hpp"
+#include "boo2/inputdev/NintendoPowerA.hpp"
+#include "boo2/inputdev/XInputPad.hpp"
 #include "IHIDDevice.hpp"
 
 namespace boo2 {
 
-extern const DeviceSignature BOO_DEVICE_SIGS[];
+const DeviceSignature BOO_DEVICE_SIGS[] = {
+    DEVICE_SIG(DolphinSmashAdapter, 0x57e, 0x337, DeviceType::USB),
+    DEVICE_SIG(DualshockPad, 0x54c, 0x268, DeviceType::HID),
+    DEVICE_SIG(GenericPad, 0, 0, DeviceType::HID),
+    DEVICE_SIG(NintendoPowerA, 0x20D6, 0xA711, DeviceType::USB),
+    DEVICE_SIG(XInputPad, 0, 0, DeviceType::XInput),
+    DEVICE_SIG_SENTINEL(),
+};
 
 bool DeviceSignature::DeviceMatchToken(const DeviceToken& token, const TDeviceSignatureSet& sigSet) {
   if (token.getDeviceType() == DeviceType::HID) {
