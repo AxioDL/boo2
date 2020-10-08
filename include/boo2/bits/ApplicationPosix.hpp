@@ -112,7 +112,7 @@ public:
         utfFunc(keysym, mods);
       } else {
         switch (key - 8) {
-#define BOO2_SPECIAL_KEYCODE(name, xkbcode, vkcode)                            \
+#define BOO2_SPECIAL_KEYCODE(name, xkbcode, ...)                               \
   case xkbcode:                                                                \
     specialFunc(Keycode::name, mods);                                          \
     break;
@@ -263,8 +263,7 @@ inline logvisor::Module
 
 template <class App, class Win, template <class, class> class Delegate>
 class ApplicationPosix
-    : public ApplicationBase,
-      public ApplicationVulkan<PosixPipelineCacheFileManager> {
+    : public ApplicationBase<VulkanTraits, PosixPipelineCacheFileManager> {
 protected:
   Delegate<App, Win> m_delegate;
   XdgPaths m_xdgPaths;
@@ -275,12 +274,11 @@ protected:
                             SystemStringView appName,
                             DelegateArgs&&... args) noexcept
       : ApplicationBase(argc, argv, appName),
-        ApplicationVulkan<PosixPipelineCacheFileManager>(appName),
         m_delegate(std::forward<DelegateArgs>(args)...) {}
 
   bool pumpBuildPipelines() noexcept {
-    return this->pumpBuildVulkanPipelines(m_pcfm, static_cast<App&>(*this),
-                                          m_delegate);
+    return this->pumpBuildRHIPipelines(m_pcfm, static_cast<App&>(*this),
+                                       m_delegate);
   }
 
   ~ApplicationPosix() noexcept { WindowDecorations::shutdown(); }
