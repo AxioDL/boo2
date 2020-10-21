@@ -1,4 +1,4 @@
-#include "lib/inputdev/IHIDDevice.hpp"
+#include "IHIDDevice.hpp"
 
 namespace boo2 {
 

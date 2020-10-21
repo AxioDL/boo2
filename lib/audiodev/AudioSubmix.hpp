@@ -11,7 +11,10 @@
 #include "boo2/audiodev/IAudioSubmix.hpp"
 #include "../Common.hpp"
 
-#if __SSE__
+#ifdef __ARM_NEON
+#include "sse2neon.h"
+#define __SSE__ 1
+#elif __SSE__
 #include <immintrin.h>
 #endif
 

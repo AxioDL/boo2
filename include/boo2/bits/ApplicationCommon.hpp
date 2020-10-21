@@ -17,7 +17,7 @@ std::vector<SystemString> Args;
 SystemString AppName;
 #endif
 
-#if HSH_ENABLE_VULKAN
+#if HSH_ENABLE_VULKAN && !HSH_PROFILE_MODE
 
 class VulkanInstance : public hsh::vulkan_instance_owner {
   static logvisor::Module Log;
@@ -73,7 +73,7 @@ struct VulkanTraits {
 
 #endif
 
-#if HSH_ENABLE_METAL
+#if HSH_ENABLE_METAL && !HSH_PROFILE_MODE
 
 class MetalInstance : public hsh::metal_instance_owner {
   static logvisor::Module Log;
@@ -112,21 +112,89 @@ struct MetalTraits {
 
 #endif
 
-template <class RHITraits, class PCFM> class ApplicationBase {
+#if HSH_ENABLE_DEKO3D && !HSH_PROFILE_MODE
+
+class DekoInstance {
+  static logvisor::Module Log;
+
+public:
+  explicit DekoInstance(SystemStringView appName) noexcept {}
+};
+inline logvisor::Module DekoInstance::Log("boo2::DekoInstance");
+
+class DekoDevice : public hsh::deko_device_owner {
+  static logvisor::Module Log;
+
+  static void DekoErrorHandler(void*, const char* Context, DkResult Result,
+                               const char* Message) noexcept {
+    if (Result == DkResult_Success) {
+      Log.report(logvisor::Warning, FMT_STRING("Warning from deko[{}]: {}"),
+                 Context, Message);
+    } else {
+      Log.report(logvisor::Fatal, FMT_STRING("Error from deko[{}]: {}: {}"),
+                 Context, Result, Message);
+    }
+  }
+
+  static constexpr uint32_t CmdBufSize = 0x1000000;
+  static constexpr uint32_t CopyCmdMemSize = 0x1000000;
+  static void DekoAddMemoryHandler(const char* CmdBufName, DkCmdBuf Cmdbuf,
+                                   size_t MinReqSize) noexcept {
+    Log.report(logvisor::Fatal, FMT_STRING("{} out of memory; needs {}"),
+               CmdBufName, MinReqSize);
+  }
+
+public:
+  explicit DekoDevice() noexcept
+      : hsh::deko_device_owner(hsh::create_deko_device(
+            DekoErrorHandler, DkCmdBufAddMemFunc(DekoAddMemoryHandler),
+            CmdBufSize, CopyCmdMemSize)) {}
+
+  using BuildPump = hsh::deko_device_owner::pipeline_build_pump;
+};
+inline logvisor::Module DekoDevice::Log("boo2::DekoDevice");
+
+struct DekoTraits {
+  using Instance = DekoInstance;
+  using Device = DekoDevice;
+};
+
+#endif
+
+#if !HSH_PROFILE_MODE
+template <class RHITraits
+#if !HSH_ENABLE_DEKO3D
+          , class PCFM
+#endif
+          >
+#endif
+class ApplicationBase {
 protected:
+#if !HSH_PROFILE_MODE
   typename RHITraits::Instance m_instance;
   typename RHITraits::Device m_device;
-
+#if HSH_ENABLE_DEKO3D
+  typename RHITraits::Device::BuildPump m_buildPump;
+  bool m_startedBuildPump = false;
+#else
   typename RHITraits::Device::template BuildPump<PCFM> m_buildPump;
+#endif
+#endif
 
   explicit ApplicationBase(SystemStringView appName) noexcept
-      : m_instance(appName) {
+#if !HSH_PROFILE_MODE
+      : m_instance(appName)
+#endif
+  {
     AppName = appName;
   }
 
   explicit ApplicationBase(int argc, SystemChar** argv,
                            SystemStringView appName) noexcept
-      : m_instance(appName) {
+#if !HSH_PROFILE_MODE
+      : m_instance(appName)
+#endif
+  {
     if (argc > 1) {
       Args.reserve(argc - 1);
       for (int i = 1; i < argc; ++i)
@@ -135,12 +203,23 @@ protected:
     AppName = appName;
   }
 
+#if !HSH_PROFILE_MODE
   template <class App, class Delegate>
+#if HSH_ENABLE_DEKO3D
+  bool pumpBuildRHIPipelines(App& a, Delegate& delegate) noexcept {
+#else
   bool pumpBuildRHIPipelines(PCFM& pcfm, App& a, Delegate& delegate) noexcept {
+#endif
     std::size_t done, count;
 
+#if HSH_ENABLE_DEKO3D
+    if (!m_startedBuildPump) {
+      m_buildPump = m_device.start_build_pipelines();
+      m_startedBuildPump = true;
+#else
     if (!m_buildPump) {
       m_buildPump = m_device.start_build_pipelines(pcfm);
+#endif
       std::tie(done, count) = m_buildPump.get_progress();
       delegate.onStartBuildPipelines(a, done, count);
       return count != 0;
@@ -162,6 +241,7 @@ protected:
     delegate.onEndBuildPipelines(a, done, count);
     return false;
   }
+#endif
 };
 
 #undef DELETE

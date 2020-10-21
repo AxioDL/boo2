@@ -101,26 +101,26 @@ endif ()
 
 # LSR bindings:
 
-if (WITH_LSR_BINDINGS)
-  set (LSR soxr-lsr)
-  set (LSR_SO_VERSION 0.1.9)
-  set (LSR_SO_VERSION_MAJOR 0)
-  add_library (${LSR} ${LIB_TYPE} lsr)
-  target_link_libraries (${LSR} soxr)
-  set_target_properties (${LSR} PROPERTIES
-    VERSION "${LSR_SO_VERSION}"
-    SOVERSION ${LSR_SO_VERSION_MAJOR}
-    INSTALL_NAME_DIR ${LIB_INSTALL_DIR}
-    LINK_INTERFACE_LIBRARIES ""
-    PUBLIC_HEADER "${LSR}.h")
-  if (BUILD_FRAMEWORK)
-    set_target_properties (${LSR} PROPERTIES FRAMEWORK TRUE)
-  elseif (NOT WIN32)
-    set (TARGET_PCS "${TARGET_PCS} ${CMAKE_CURRENT_BINARY_DIR}/${LSR}.pc")
-    configure_file (${CMAKE_CURRENT_SOURCE_DIR}/${LSR}.pc.in ${CMAKE_CURRENT_BINARY_DIR}/${LSR}.pc)
-    install (FILES ${CMAKE_CURRENT_BINARY_DIR}/${LSR}.pc DESTINATION ${LIB_INSTALL_DIR}/pkgconfig)
-  endif ()
-endif ()
+#if (WITH_LSR_BINDINGS)
+#  set (LSR soxr-lsr)
+#  set (LSR_SO_VERSION 0.1.9)
+#  set (LSR_SO_VERSION_MAJOR 0)
+#  add_library (${LSR} ${LIB_TYPE} lsr)
+#  target_link_libraries (${LSR} soxr)
+#  set_target_properties (${LSR} PROPERTIES
+#    VERSION "${LSR_SO_VERSION}"
+#    SOVERSION ${LSR_SO_VERSION_MAJOR}
+#    INSTALL_NAME_DIR ${LIB_INSTALL_DIR}
+#    LINK_INTERFACE_LIBRARIES ""
+#    PUBLIC_HEADER "${LSR}.h")
+#  if (BUILD_FRAMEWORK)
+#    set_target_properties (${LSR} PROPERTIES FRAMEWORK TRUE)
+#  elseif (NOT WIN32)
+#    set (TARGET_PCS "${TARGET_PCS} ${CMAKE_CURRENT_BINARY_DIR}/${LSR}.pc")
+#    configure_file (${CMAKE_CURRENT_SOURCE_DIR}/${LSR}.pc.in ${CMAKE_CURRENT_BINARY_DIR}/${LSR}.pc)
+#    install (FILES ${CMAKE_CURRENT_BINARY_DIR}/${LSR}.pc DESTINATION ${LIB_INSTALL_DIR}/pkgconfig)
+#  endif ()
+#endif ()
 
 
 

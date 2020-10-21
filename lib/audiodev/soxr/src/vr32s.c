@@ -13,7 +13,12 @@
 #endif
 #include <string.h>
 #include <stdlib.h>
+#ifdef __ARM_NEON
+#pragma GCC diagnostic ignored "-Wmissing-braces"
+#include "sse2neon.h"
+#else
 #include <xmmintrin.h>
+#endif
 #include "internal.h"
 #define FIFO_SIZE_T int
 #define FIFO_MIN 0x8000

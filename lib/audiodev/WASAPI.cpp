@@ -3,7 +3,7 @@
 #include <iterator>
 
 #include "boo/IApplication.hpp"
-#include "lib/audiodev/AudioVoiceEngine.hpp"
+#include "AudioVoiceEngine.hpp"
 
 #include <Mmdeviceapi.h>
 #include <Audioclient.h>

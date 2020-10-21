@@ -51,12 +51,11 @@ public:
 };
 
 template <template <class, class> class Delegate>
-class ApplicationNx : public ApplicationBase {
+class ApplicationNx : public ApplicationBase<DekoTraits> {
   friend WindowNx<ApplicationNx<Delegate>>;
   using Window = WindowNx<ApplicationNx<Delegate>>;
   static logvisor::Module Log;
 
-  hsh::deko_device_owner m_device;
   Delegate<ApplicationNx, Window> m_delegate;
   bool m_builtWindow = false;
 
@@ -80,6 +79,8 @@ public:
     return window;
   }
 
+  void dispatchLatestEvents() noexcept {}
+
   void quit(int code = 0) noexcept {
     m_running = false;
     m_exitCode = code;
@@ -93,31 +94,7 @@ private:
   bool m_startedPipelineBuild = false;
 
   bool pumpBuildPipelines() noexcept {
-    std::size_t done, count;
-
-    if (!m_startedPipelineBuild) {
-      m_startedPipelineBuild = true;
-      m_buildPump = m_device.start_build_pipelines();
-      std::tie(done, count) = m_buildPump.get_progress();
-      m_delegate.onStartBuildPipelines(*this, done, count);
-      return count != 0;
-    }
-
-    // Build pipelines for approximately 100ms before another application cycle
-    auto start = std::chrono::steady_clock::now();
-    while (m_buildPump.pump()) {
-      if (std::chrono::duration_cast<std::chrono::milliseconds>(
-              std::chrono::steady_clock::now() - start)
-              .count() > 100) {
-        std::tie(done, count) = m_buildPump.get_progress();
-        m_delegate.onUpdateBuildPipelines(*this, done, count);
-        return true;
-      }
-    }
-
-    std::tie(done, count) = m_buildPump.get_progress();
-    m_delegate.onEndBuildPipelines(*this, done, count);
-    return false;
+    return this->pumpBuildRHIPipelines(*this, m_delegate);
   }
 
   int run() noexcept {
@@ -130,7 +107,7 @@ private:
       hidScanInput();
 
       u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
-      if (kDown & KEY_PLUS)
+      if (kDown & KEY_MINUS)
         break; // break in order to return to hbmenu
 
       this->m_device.enter_draw_context([this]() {
@@ -148,29 +125,11 @@ private:
     return m_exitCode;
   }
 
-  static void DekoErrorHandler(void*, const char* Context, DkResult Result,
-                               const char* Message) noexcept {
-    Log.report(logvisor::Fatal, FMT_STRING("Error from deko[{}]: {}: {}"),
-               Context, Result, Message);
-  }
-
-  static constexpr uint32_t CmdBufSize = 0x10000;
-  static constexpr uint32_t CopyCmdMemSize = 0x4000;
-  static void DekoAddMemoryHandler(const char* CmdBufName, DkCmdBuf Cmdbuf,
-                                   size_t MinReqSize) noexcept {
-    Log.report(logvisor::Fatal, FMT_STRING("{} out of memory; needs {}"),
-               CmdBufName, MinReqSize);
-  }
-
   template <typename... DelegateArgs>
   explicit ApplicationNx(int argc, SystemChar** argv, SystemStringView appName,
                          DelegateArgs&&... args) noexcept
       : ApplicationBase(argc, argv, appName),
-        m_delegate(std::forward<DelegateArgs>(args)...) {
-    m_device = hsh::create_deko_device(DekoErrorHandler,
-                                       DkCmdBufAddMemFunc(DekoAddMemoryHandler),
-                                       CmdBufSize, CopyCmdMemSize);
-  }
+        m_delegate(std::forward<DelegateArgs>(args)...) {}
 
 public:
   ApplicationNx(ApplicationNx&&) = delete;

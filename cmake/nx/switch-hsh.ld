@@ -63,46 +63,6 @@ SECTIONS
 		. = ALIGN(8);
 	} :rodata
 
-	.deko.control :
-	{
-		__deko_shader_memblock_size = .;
-		LONG(__deko_shader_unusable_end - __deko_shader_begin)
-		. = ALIGN(64);
-		LONG(0x206C6F6C);
-		LONG(0x636E6966);
-		LONG(0x68772073);
-		LONG(0x20642779);
-		LONG(0x20756F79);
-		LONG(0x656B616D);
-		LONG(0x20737520);
-		LONG(0x74736177);
-		LONG(0x70732065);
-		LONG(0x00656361);
-		__deko_control = .;
-		LONG(0x48534B44);
-		LONG(24);
-		LONG((__deko_shader_begin - __deko_control + 255) / 256 * 256);
-		LONG(__deko_shader_end - __deko_shader_begin);
-		LONG(24);
-		LONG((__deko_control_end - __deko_control_begin) / 64);
-		__deko_control_begin = .;
-		*(.deko.control)
-		__deko_control_end = .;
-		. = ALIGN(0x1000);
-	} :rodata
-
-	.deko.shader :
-	{
-		__deko_shader_begin = .;
-		*(.deko.shader)
-		. = ALIGN(0x100);
-		__deko_shader_end = .;
-		. += 0x400;
-		. = ALIGN(0x1000);
-		__deko_shader_unusable_end = .;
-		. = ALIGN(8);
-	} :rodata
-
 	.eh_frame_hdr     : { __eh_frame_hdr_start = .; *(.eh_frame_hdr) *(.eh_frame_entry .eh_frame_entry.*) __eh_frame_hdr_end = .; } :rodata
 	.eh_frame         : ONLY_IF_RO { KEEP (*(.eh_frame)) *(.eh_frame.*) } :rodata
 	.gcc_except_table : ONLY_IF_RO { *(.gcc_except_table .gcc_except_table.*) } :rodata
@@ -193,6 +153,46 @@ SECTIONS
 	{
 		*(.data .data.* .gnu.linkonce.d.*)
 		SORT(CONSTRUCTORS)
+	} :data
+
+	.deko.control :
+	{
+		__deko_shader_memblock_size = .;
+		LONG(__deko_shader_unusable_end - __deko_shader_begin)
+		. = ALIGN(64);
+		LONG(0x206C6F6C);
+		LONG(0x636E6966);
+		LONG(0x68772073);
+		LONG(0x20642779);
+		LONG(0x20756F79);
+		LONG(0x656B616D);
+		LONG(0x20737520);
+		LONG(0x74736177);
+		LONG(0x70732065);
+		LONG(0x00656361);
+		__deko_control = .;
+		LONG(0x48534B44);
+		LONG(24);
+		LONG((__deko_shader_begin - __deko_control + 255) / 256 * 256);
+		LONG(__deko_shader_end - __deko_shader_begin);
+		LONG(24);
+		LONG((__deko_control_end - __deko_control_begin) / 64);
+		__deko_control_begin = .;
+		*(.deko.control)
+		__deko_control_end = .;
+		. = ALIGN(0x1000);
+	} :data
+
+	.deko.shader :
+	{
+		__deko_shader_begin = .;
+		*(.deko.shader)
+		. = ALIGN(0x100);
+		__deko_shader_end = .;
+		. += 0x400;
+		. = ALIGN(0x1000);
+		__deko_shader_unusable_end = .;
+		. = ALIGN(8);
 	} :data
 
 	__bss_start__ = .;

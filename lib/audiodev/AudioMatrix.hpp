@@ -5,7 +5,10 @@
 #include <cstddef>
 #include <cstdint>
 
-#if __SSE__
+#ifdef __ARM_NEON
+#include "sse2neon.h"
+#define __SSE__ 1
+#elif __SSE__
 #include <immintrin.h>
 #endif
 

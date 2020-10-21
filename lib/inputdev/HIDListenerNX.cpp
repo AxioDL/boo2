@@ -1,4 +1,4 @@
-#include "boo/inputdev/IHIDListener.hpp"
+#include "boo2/inputdev/IHIDListener.hpp"
 
 namespace boo2 {
 

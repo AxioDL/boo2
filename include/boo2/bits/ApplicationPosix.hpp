@@ -208,6 +208,7 @@ public:
   }
 };
 
+#if !HSH_PROFILE_MODE
 struct PosixPipelineCacheFileManager {
   static logvisor::Module Log;
   const XdgPaths& m_paths;
@@ -260,14 +261,20 @@ struct PosixPipelineCacheFileManager {
 };
 inline logvisor::Module
     PosixPipelineCacheFileManager::Log("boo2::PosixPipelineCacheFileManager");
+#endif
 
 template <class App, class Win, template <class, class> class Delegate>
-class ApplicationPosix
-    : public ApplicationBase<VulkanTraits, PosixPipelineCacheFileManager> {
+class ApplicationPosix : public ApplicationBase
+#if !HSH_PROFILE_MODE
+                         <VulkanTraits, PosixPipelineCacheFileManager>
+#endif
+{
 protected:
   Delegate<App, Win> m_delegate;
   XdgPaths m_xdgPaths;
+#if !HSH_PROFILE_MODE
   PosixPipelineCacheFileManager m_pcfm{m_xdgPaths};
+#endif
 
   template <typename... DelegateArgs>
   explicit ApplicationPosix(int argc, SystemChar** argv,
@@ -276,10 +283,12 @@ protected:
       : ApplicationBase(argc, argv, appName),
         m_delegate(std::forward<DelegateArgs>(args)...) {}
 
+#if !HSH_PROFILE_MODE
   bool pumpBuildPipelines() noexcept {
     return this->pumpBuildRHIPipelines(m_pcfm, static_cast<App&>(*this),
                                        m_delegate);
   }
+#endif
 
   ~ApplicationPosix() noexcept { WindowDecorations::shutdown(); }
 };

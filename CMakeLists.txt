@@ -44,7 +44,6 @@ set(boo2_SRCS
   lib/WindowDecorationsRes.cpp
   lib/audiodev/AudioSubmix.cpp
   lib/audiodev/AudioVoice.cpp
-  lib/audiodev/AudioMatrixSSE.cpp
   lib/audiodev/AudioVoiceEngine.cpp
   lib/audiodev/LtRtProcessing.cpp
   lib/audiodev/MIDICommon.cpp
@@ -69,6 +68,7 @@ set(boo2_INCS include)
 
 if(WIN32)
   list(APPEND boo2_LIBS Dwmapi)
+  list(APPEND boo2_SRCS lib/audiodev/AudioMatrixSSE.cpp)
 elseif(APPLE)
   if(NOT BOO2_MAC_CATALYST AND metal-bin-mac IN_LIST HSH_TARGETS)
     find_library(APPKIT_LIB AppKit)
@@ -82,8 +82,15 @@ elseif(APPLE)
     list(APPEND boo2_LIBS ${UIKIT_LIB})
     list(APPEND boo2_INCS ${UIKIT_LIB})
   endif()
+  list(APPEND boo2_SRCS lib/audiodev/AudioMatrixSSE.cpp)
 elseif(NX)
   list(APPEND boo2_LIBS debug deko3dd optimized deko3d debug nxd optimized nx)
+  list(APPEND boo2_SRCS
+    lib/audiodev/AudioMatrix.cpp
+    lib/audiodev/libnx.cpp
+    lib/inputdev/HIDListenerNX.cpp
+    lib/inputdev/HIDDeviceNX.cpp
+  )
 else()
   include(FindPkgConfig)
   if(TARGET PkgConfig::vk-xcb)
@@ -124,8 +131,12 @@ else()
   if(NOT udev_FOUND)
     message(FATAL_ERROR "Unable to locate development installation of libudev")
   endif()
-  list(APPEND boo2_SRCS lib/inputdev/HIDListenerUdev.cpp lib/inputdev/HIDDeviceUdev.cpp)
-  list(APPEND boo2_LIBS PkgConfig::pulse PkgConfig::udev ${CMAKE_DL_LIBS})
+  list(APPEND boo2_SRCS
+    lib/audiodev/AudioMatrixSSE.cpp
+    lib/inputdev/HIDListenerUdev.cpp
+    lib/inputdev/HIDDeviceUdev.cpp
+  )
+  list(APPEND boo2_LIBS asound PkgConfig::pulse PkgConfig::udev ${CMAKE_DL_LIBS})
 endif()
 
 add_library(boo2 ${boo2_SRCS})

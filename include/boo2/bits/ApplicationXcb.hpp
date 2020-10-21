@@ -108,7 +108,7 @@ template <class Application> class WindowXcb {
                         m_parent->m_atoms.m_WM_PROTOCOLS, 4, 32, 1,
                         &m_parent->m_atoms.m_WM_DELETE_WINDOW);
 
-    xcb_size_hints_t hints;
+    xcb_size_hints_t hints{};
     xcb_icccm_size_hints_set_min_size(&hints, MinDim, MinDim);
     xcb_icccm_size_hints_set_max_size(&hints, MaxDim, MaxDim);
     xcb_icccm_set_wm_size_hints(*m_parent, m_window, XCB_ATOM_WM_NORMAL_HINTS,
@@ -117,6 +117,7 @@ template <class Application> class WindowXcb {
     m_parent->flushLater();
   }
 
+#if !HSH_PROFILE_MODE
   bool createSurface(
       vk::UniqueSurfaceKHR&& physSurface,
       std::function<void(const hsh::extent2d&)>&& resizeLambda) noexcept {
@@ -133,6 +134,7 @@ template <class Application> class WindowXcb {
         [dec = m_decorations.get()]() { dec->draw(); });
     return m_hshSurface.operator bool();
   }
+#endif
 
 public:
   using ID = xcb_window_t;
@@ -289,6 +291,7 @@ public:
     if (!window)
       return {};
 
+#if !HSH_PROFILE_MODE
     auto physSurface = this->m_instance.create_phys_surface(m_conn, window);
     if (!physSurface) {
       Log.report(logvisor::Error,
@@ -318,6 +321,7 @@ public:
           FMT_STRING("Vulkan surface not compatible with existing device"));
       return {};
     }
+#endif
 
     xcb_map_window(m_conn, window);
     flushLater();
@@ -464,8 +468,10 @@ private:
   }
 
   int run() noexcept {
+#if !HSH_PROFILE_MODE
     if (!this->m_instance)
       return 1;
+#endif
 
     m_keymap.setKeymap(m_conn, &m_xkbBaseEvent);
 
@@ -474,20 +480,26 @@ private:
     while (m_running) {
       dispatchLatestEvents();
 
+#if !HSH_PROFILE_MODE
       if (this->m_device) {
         this->m_device.enter_draw_context([this]() {
           if (m_buildingPipelines)
             m_buildingPipelines = this->pumpBuildPipelines();
           else
+#endif
             this->m_delegate.onAppIdle(*this);
+#if !HSH_PROFILE_MODE
         });
       }
+#endif
     }
 
     this->m_delegate.onAppExiting(*this);
 
+#if !HSH_PROFILE_MODE
     if (this->m_device)
       this->m_device.wait_idle();
+#endif
     return m_exitCode;
   }
 
